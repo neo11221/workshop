@@ -1,25 +1,28 @@
 
 import React, { useState, useEffect } from 'react';
 import { HashRouter, Routes, Route, Link, useLocation } from 'react-router-dom';
-import { 
-  LayoutDashboard, 
-  ShoppingBag, 
-  History, 
-  ShieldCheck, 
-  LogOut, 
-  Menu, 
+import {
+  LayoutDashboard,
+  ShoppingBag,
+  History,
+  ShieldCheck,
+  LogOut,
+  Menu,
   X,
   Trophy,
   Zap,
-  UserCircle
+  UserCircle,
+  Sparkles
 } from 'lucide-react';
 import { UserProfile, RankTitle, UserRole } from './types';
-import { getUser, saveUser, getStudents } from './utils/storage';
+import { getUser, saveUser, getStudents, logoutUser } from './utils/storage';
 import { RANKS } from './constants';
 import Dashboard from './components/Dashboard';
 import Shop from './components/Shop';
 import Redemptions from './components/Redemptions';
 import Admin from './components/Admin';
+import WishingWell from './components/WishingWell';
+import Login from './components/Login';
 
 const Navigation = ({ user, currentRank, onSwitchUser }: { user: UserProfile, currentRank: RankTitle, onSwitchUser: () => void }) => {
   const location = useLocation();
@@ -28,10 +31,11 @@ const Navigation = ({ user, currentRank, onSwitchUser }: { user: UserProfile, cu
   const links = [
     { path: '/', label: '總覽', icon: LayoutDashboard },
     { path: '/shop', label: '點數商城', icon: ShoppingBag },
+    { path: '/wishes', label: '許願池', icon: Sparkles },
     { path: '/history', label: '兌換紀錄', icon: History },
   ];
 
-  if (user.role === UserRole.ADMIN || true) { // Demo 期間開放所有權限
+  if (user.role === UserRole.ADMIN) {
     links.push({ path: '/admin', label: '管理後台', icon: ShieldCheck });
   }
 
@@ -58,11 +62,10 @@ const Navigation = ({ user, currentRank, onSwitchUser }: { user: UserProfile, cu
               key={link.path}
               to={link.path}
               onClick={() => setIsOpen(false)}
-              className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${
-                isActive 
-                  ? 'bg-indigo-50 text-indigo-700 font-bold shadow-sm' 
-                  : 'text-slate-600 hover:bg-slate-50'
-              }`}
+              className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${isActive
+                ? 'bg-indigo-50 text-indigo-700 font-bold shadow-sm'
+                : 'text-slate-600 hover:bg-slate-50'
+                }`}
             >
               <Icon size={20} />
               <span>{link.label}</span>
@@ -81,14 +84,10 @@ const Navigation = ({ user, currentRank, onSwitchUser }: { user: UserProfile, cu
             </div>
           </div>
         </div>
-        <button 
+        <button
           onClick={onSwitchUser}
           className="flex items-center gap-2 text-indigo-600 hover:text-indigo-800 transition-colors text-xs font-bold w-full bg-indigo-50 p-2 rounded-lg justify-center mb-2"
         >
-          <UserCircle size={14} />
-          <span>切換使用者 (Demo)</span>
-        </button>
-        <button className="flex items-center gap-2 text-slate-400 hover:text-red-500 transition-colors text-xs font-medium w-full px-2">
           <LogOut size={14} />
           <span>登出系統</span>
         </button>
@@ -97,35 +96,40 @@ const Navigation = ({ user, currentRank, onSwitchUser }: { user: UserProfile, cu
   );
 };
 
+
 const App: React.FC = () => {
-  const [user, setUser] = useState<UserProfile>(getUser());
-  
-  const currentRank = RANKS.reduce((prev, curr) => {
+  const [user, setUser] = useState<UserProfile | null>(getUser());
+
+  const currentRank = user ? RANKS.reduce((prev, curr) => {
     if (user.totalEarned >= curr.threshold) return curr;
     return prev;
-  }, RANKS[0]);
+  }, RANKS[0]) : RANKS[0];
 
-  const refreshUser = () => setUser(getUser());
-
-  const handleSwitchUser = () => {
-    const students = getStudents();
-    const currentIndex = students.findIndex(s => s.id === user.id);
-    const nextIndex = (currentIndex + 1) % students.length;
-    const nextUser = students[nextIndex];
-    saveUser(nextUser);
-    refreshUser();
+  const refreshUser = () => {
+    const u = getUser();
+    if (u) setUser(u);
   };
+
+  const handleLogout = () => {
+    logoutUser();
+    setUser(null);
+  };
+
+  if (!user) {
+    return <Login onLogin={setUser} />;
+  }
 
   return (
     <HashRouter>
       <div className="min-h-screen flex flex-col md:flex-row bg-[#fbfcfd]">
-        <Navigation user={user} currentRank={currentRank} onSwitchUser={handleSwitchUser} />
-        
+        <Navigation user={user} currentRank={currentRank} onSwitchUser={handleLogout} />
+
         <main className="flex-1 md:ml-64 p-4 md:p-8">
           <div className="max-w-6xl mx-auto">
             <Routes>
               <Route path="/" element={<Dashboard user={user} rank={currentRank} onUserUpdate={refreshUser} />} />
               <Route path="/shop" element={<Shop user={user} onUserUpdate={refreshUser} />} />
+              <Route path="/wishes" element={<WishingWell user={user} />} />
               <Route path="/history" element={<Redemptions user={user} />} />
               <Route path="/admin" element={<Admin onRefresh={refreshUser} />} />
             </Routes>

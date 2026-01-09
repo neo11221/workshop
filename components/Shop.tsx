@@ -1,9 +1,7 @@
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ShoppingCart, AlertCircle, Check, X, Tag, Package } from 'lucide-react';
 import { Product, UserProfile, Redemption } from '../types';
-import { PRODUCTS } from '../constants';
-import { saveUser, addRedemption } from '../utils/storage';
+import { saveUser, addRedemption, getProducts, updateProductStock } from '../utils/storage';
 
 interface ShopProps {
   user: UserProfile;
@@ -13,10 +11,19 @@ interface ShopProps {
 const Shop: React.FC<ShopProps> = ({ user, onUserUpdate }) => {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [filter, setFilter] = useState<string>('all');
+  const [products, setProducts] = useState<Product[]>([]);
 
-  const filteredProducts = PRODUCTS.filter(p => filter === 'all' || p.category === filter);
+  useEffect(() => {
+    setProducts(getProducts());
+  }, [user]); // Refresh when user updates might be a good time, or just on mount.
+
+  const filteredProducts = products.filter(p => filter === 'all' || p.category === filter);
 
   const handleRedeem = () => {
+    if (user.role === 'GUEST') {
+      alert('訪客模式無法兌換商品，請登入學生帳號。');
+      return;
+    }
     if (!selectedProduct || user.points < selectedProduct.price || selectedProduct.stock <= 0) return;
 
     const newRedemption: Redemption = {
@@ -35,10 +42,14 @@ const Shop: React.FC<ShopProps> = ({ user, onUserUpdate }) => {
       points: user.points - selectedProduct.price
     };
 
-    // 此處應更新全域庫存狀態，但在本地 Demo 中我們僅模擬
+    // Update storage
     addRedemption(newRedemption);
     saveUser(updatedUser);
+    updateProductStock(selectedProduct.id, 1);
+
+    // Refresh local state
     onUserUpdate();
+    setProducts(getProducts()); // Refresh stock
     setSelectedProduct(null);
     alert('🎉 兌換成功！請前往兌換紀錄查看 QR Code。');
   };
@@ -55,11 +66,10 @@ const Shop: React.FC<ShopProps> = ({ user, onUserUpdate }) => {
           <button
             key={cat}
             onClick={() => setFilter(cat)}
-            className={`px-6 py-2.5 rounded-2xl text-sm font-bold transition-all ${
-              filter === cat 
-                ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-100' 
-                : 'bg-white text-slate-600 border border-slate-200 hover:border-indigo-300'
-            }`}
+            className={`px-6 py-2.5 rounded-2xl text-sm font-bold transition-all ${filter === cat
+              ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-100'
+              : 'bg-white text-slate-600 border border-slate-200 hover:border-indigo-300'
+              }`}
           >
             {cat === 'all' ? '全部商品' : cat === 'food' ? '美味點心' : cat === 'electronic' ? '科技產品' : cat === 'ticket' ? '票券' : '其他'}
           </button>
@@ -70,17 +80,17 @@ const Shop: React.FC<ShopProps> = ({ user, onUserUpdate }) => {
         {filteredProducts.map(product => {
           const canAfford = user.points >= product.price;
           const isOutOfStock = product.stock <= 0;
-          
+
           return (
-            <div 
-              key={product.id} 
+            <div
+              key={product.id}
               className={`bg-white rounded-[2rem] border border-slate-100 overflow-hidden shadow-sm hover:shadow-2xl transition-all flex flex-col group ${isOutOfStock ? 'opacity-75 grayscale-[0.5]' : ''}`}
             >
               <div className="relative h-56 overflow-hidden">
-                <img 
-                  src={product.imageUrl} 
-                  alt={product.name} 
-                  className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" 
+                <img
+                  src={product.imageUrl}
+                  alt={product.name}
+                  className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
                 />
                 <div className="absolute top-5 left-5">
                   <span className="bg-white/90 backdrop-blur text-indigo-600 text-[10px] px-3 py-1.5 rounded-full font-black tracking-widest shadow-sm">
@@ -93,17 +103,17 @@ const Shop: React.FC<ShopProps> = ({ user, onUserUpdate }) => {
                   </div>
                 )}
               </div>
-              
+
               <div className="p-8 flex flex-col flex-1">
                 <div className="flex justify-between items-start mb-2">
                   <h3 className="font-black text-xl text-slate-800 leading-tight">{product.name}</h3>
                 </div>
                 <p className="text-slate-500 text-sm mb-6 flex-1 leading-relaxed">{product.description}</p>
-                
+
                 {/* 庫存顯示 */}
                 <div className="flex items-center gap-2 mb-6 text-slate-400 text-xs font-bold">
-                   <Package size={14} />
-                   <span>剩餘庫存：<span className={product.stock <= 5 ? 'text-red-500' : 'text-slate-600'}>{product.stock} 件</span></span>
+                  <Package size={14} />
+                  <span>剩餘庫存：<span className={product.stock <= 5 ? 'text-red-500' : 'text-slate-600'}>{product.stock} 件</span></span>
                 </div>
 
                 <div className="flex items-center justify-between mt-auto">
@@ -111,16 +121,15 @@ const Shop: React.FC<ShopProps> = ({ user, onUserUpdate }) => {
                     <span className="text-2xl font-black">{product.price.toLocaleString()}</span>
                     <span className="text-xs font-bold text-slate-400 uppercase tracking-tighter">pts</span>
                   </div>
-                  <button 
+                  <button
                     onClick={() => setSelectedProduct(product)}
                     disabled={!canAfford || isOutOfStock}
-                    className={`px-6 py-3 rounded-2xl font-black text-sm transition-all shadow-md ${
-                      isOutOfStock
-                        ? 'bg-slate-100 text-slate-400 cursor-not-allowed shadow-none'
-                        : canAfford 
-                          ? 'bg-indigo-600 text-white hover:bg-indigo-700 hover:shadow-indigo-200 active:scale-95' 
-                          : 'bg-slate-100 text-slate-400 cursor-not-allowed shadow-none'
-                    }`}
+                    className={`px-6 py-3 rounded-2xl font-black text-sm transition-all shadow-md ${isOutOfStock
+                      ? 'bg-slate-100 text-slate-400 cursor-not-allowed shadow-none'
+                      : canAfford
+                        ? 'bg-indigo-600 text-white hover:bg-indigo-700 hover:shadow-indigo-200 active:scale-95'
+                        : 'bg-slate-100 text-slate-400 cursor-not-allowed shadow-none'
+                      }`}
                   >
                     {isOutOfStock ? '已售罄' : '立即兌換'}
                   </button>
@@ -142,7 +151,7 @@ const Shop: React.FC<ShopProps> = ({ user, onUserUpdate }) => {
                 <X size={24} />
               </button>
             </div>
-            
+
             <h2 className="text-2xl font-black text-slate-800 mb-2">確認兌換項目</h2>
             <p className="text-slate-500 mb-8 leading-relaxed">
               您確定要花費 <span className="font-black text-indigo-600">{selectedProduct.price} 點</span> 兌換 <span className="font-black text-slate-800">「{selectedProduct.name}」</span> 嗎？
@@ -164,14 +173,14 @@ const Shop: React.FC<ShopProps> = ({ user, onUserUpdate }) => {
             </div>
 
             <div className="flex flex-col gap-3">
-              <button 
+              <button
                 onClick={handleRedeem}
                 className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-black py-5 rounded-[1.25rem] transition-all shadow-xl shadow-indigo-100 flex items-center justify-center gap-3 text-lg"
               >
                 <Check size={24} />
                 確認兌換
               </button>
-              <button 
+              <button
                 onClick={() => setSelectedProduct(null)}
                 className="w-full bg-white border border-slate-200 text-slate-600 font-black py-4 rounded-[1.25rem] hover:bg-slate-50 transition-all"
               >

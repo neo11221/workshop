@@ -1,10 +1,10 @@
 
 import React, { useEffect, useState } from 'react';
 import { Trophy, TrendingUp, Sparkles, CheckCircle, ChevronRight, Medal, Flame, Star, Target } from 'lucide-react';
-import { UserProfile, RankTitle } from '../types';
+import { UserProfile, RankTitle, Mission } from '../types';
 import { RANKS } from '../constants';
 import { getEncouragement } from '../services/geminiService';
-import { saveUser } from '../utils/storage';
+import { saveUser, getMissions, hasCompletedMission, addChallengeHistory } from '../utils/storage';
 
 interface DashboardProps {
   user: UserProfile;
@@ -12,68 +12,51 @@ interface DashboardProps {
   onUserUpdate: () => void;
 }
 
-interface TieredMission {
-  id: string;
-  type: 'normal' | 'challenge' | 'hard';
-  title: string;
-  description: string;
-  points: number;
-  multiplier: number;
-}
-
 const Dashboard: React.FC<DashboardProps> = ({ user, rank, onUserUpdate }) => {
   const [message, setMessage] = useState('正在獲取導師的建議...');
-  const [missions, setMissions] = useState<TieredMission[]>([]);
+  const [missions, setMissions] = useState<Mission[]>([]);
   const [completingId, setCompletingId] = useState<string | null>(null);
 
   const nextRank = RANKS[RANKS.indexOf(rank) + 1] || null;
-  const progress = nextRank 
+  const progress = nextRank
     ? Math.min(100, ((user.totalEarned - rank.threshold) / (nextRank.threshold - rank.threshold)) * 100)
     : 100;
 
   useEffect(() => {
-    const fetchAIContent = async () => {
+    const fetchContent = async () => {
       const msg = await getEncouragement(user, rank);
       setMessage(msg);
-      
-      // 生成三種難度的任務
-      setMissions([
-        {
-          id: 'm1',
-          type: 'normal',
-          title: '完成今日回家作業',
-          description: '確實完成各科今日指派之回家作業，並經家長簽名。',
-          points: 100,
-          multiplier: 1.0
-        },
-        {
-          id: 'm2',
-          type: 'challenge',
-          title: '數學周考 80 分以上',
-          description: '在每周數學小考中獲得優異成績，展現邏輯推理能力。',
-          points: 200,
-          multiplier: 1.5
-        },
-        {
-          id: 'm3',
-          type: 'hard',
-          title: '國文段考 90 分以上',
-          description: '在學校大考中獲得卓越成績，深厚的文學涵養與理解。',
-          points: 500,
-          multiplier: 2.0
-        }
-      ]);
+
+      const allMissions = getMissions();
+      // Filter only active missions
+      setMissions(allMissions.filter(m => m.isActive));
     };
-    fetchAIContent();
+    fetchContent();
   }, [user.id, rank]);
 
-  const handleCompleteMission = (mission: TieredMission) => {
+  const handleCompleteMission = (mission: Mission) => {
     if (completingId) return;
+
+    // Check if already completed
+    if (hasCompletedMission(user.id, mission.id)) {
+      alert('此任務已經完成過了喔！');
+      return;
+    }
+
     setCompletingId(mission.id);
-    
-    const finalPoints = Math.round(mission.points * mission.multiplier);
+
+    const finalPoints = mission.points;
 
     setTimeout(() => {
+      // 1. Record Completion
+      addChallengeHistory({
+        id: `h_${Date.now()}`,
+        userId: user.id,
+        missionId: mission.id,
+        timestamp: Date.now()
+      });
+
+      // 2. Award Points
       const updatedUser = {
         ...user,
         points: user.points + finalPoints,
@@ -82,7 +65,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, rank, onUserUpdate }) => {
       saveUser(updatedUser);
       onUserUpdate();
       setCompletingId(null);
-      alert(`🎉 恭喜完成任務！\n難度倍率：${mission.multiplier}x\n共獲得 ${finalPoints} 點。`);
+      alert(`🎉 恭喜完成任務！\n共獲得 ${finalPoints} 點。`);
     }, 1000);
   };
 
@@ -93,7 +76,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, rank, onUserUpdate }) => {
           <h1 className="text-3xl font-black text-slate-800 tracking-tight">哈囉，{user.name}！</h1>
           <p className="text-slate-500 mt-1 italic max-w-xl font-medium">"{message}"</p>
         </div>
-        
+
         <div className="bg-amber-50 border border-amber-100 rounded-2xl px-5 py-3 flex items-center gap-3 self-end md:self-start shadow-sm">
           <div className="bg-amber-500 p-2 rounded-xl text-white shadow-lg shadow-amber-200">
             <Medal size={20} />
@@ -127,25 +110,25 @@ const Dashboard: React.FC<DashboardProps> = ({ user, rank, onUserUpdate }) => {
               </div>
             )}
           </div>
-          
+
           <div className="relative pt-12 pb-6 px-2">
             <div className="h-5 bg-slate-100 rounded-full w-full overflow-hidden border border-slate-200 shadow-inner p-1">
-               <div 
+              <div
                 className={`h-full ${rank.color} transition-all duration-1000 ease-out rounded-full relative overflow-hidden`}
                 style={{ width: `${progress}%` }}
               >
                 <div className="absolute inset-0 bg-white/20 animate-pulse"></div>
               </div>
             </div>
-            
-            <div 
+
+            <div
               className="absolute top-0 transition-all duration-1000 ease-out"
               style={{ left: `calc(${progress}% - 30px)` }}
             >
               <div className="relative group cursor-pointer">
                 <div className="p-1.5 bg-white rounded-full shadow-2xl border border-slate-50 transition-transform group-hover:scale-110 active:scale-95">
-                  <img 
-                    src={user.avatar} 
+                  <img
+                    src={user.avatar}
                     className={`w-14 h-14 rounded-full border-4 border-opacity-30 object-cover ${rank.color.replace('bg-', 'border-')}`}
                     alt="me"
                   />
@@ -158,7 +141,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, rank, onUserUpdate }) => {
           </div>
 
           <p className="text-center text-xs text-slate-400 font-bold mt-8 tracking-wide">
-            {nextRank 
+            {nextRank
               ? `再接再厲！距離晉升「${nextRank.name}」還差 ${nextRank.threshold - user.totalEarned} 點！`
               : '極致境界！您已經是這片森林裡最強大的學習大師！'}
           </p>
@@ -167,7 +150,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, rank, onUserUpdate }) => {
         <div className="bg-gradient-to-br from-indigo-600 via-indigo-700 to-indigo-900 rounded-[2.5rem] p-10 text-white shadow-2xl shadow-indigo-300 flex flex-col justify-center items-center text-center relative overflow-hidden">
           <div className="absolute -top-10 -right-10 w-40 h-40 bg-white/10 rounded-full blur-3xl"></div>
           <div className="absolute -bottom-10 -left-10 w-40 h-40 bg-indigo-500/20 rounded-full blur-3xl"></div>
-          
+
           <div className="w-20 h-20 bg-white/20 backdrop-blur-xl rounded-[2rem] flex items-center justify-center mb-6 border border-white/20 shadow-xl">
             <TrendingUp size={40} className="text-white drop-shadow-md" />
           </div>
@@ -186,68 +169,73 @@ const Dashboard: React.FC<DashboardProps> = ({ user, rank, onUserUpdate }) => {
             今日學習挑戰分級
           </h2>
           <div className="flex items-center gap-4 text-xs font-bold text-slate-400">
-             <span className="flex items-center gap-1"><Star size={12} className="text-amber-500" /> 多重倍率獎勵</span>
+            <span className="flex items-center gap-1"><Star size={12} className="text-amber-500" /> 多重倍率獎勵</span>
           </div>
         </div>
 
         <div className="grid grid-cols-1 gap-6">
-          {missions.map(mission => (
-            <div 
-              key={mission.id}
-              className={`bg-white border-2 border-slate-50 p-8 rounded-[2.5rem] shadow-sm hover:shadow-xl transition-all group relative overflow-hidden ${mission.id === completingId ? 'animate-pulse' : ''}`}
-            >
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-8">
-                <div className="flex gap-8 items-start">
-                  <div className={`w-20 h-20 rounded-3xl flex items-center justify-center shrink-0 shadow-inner ${
-                    mission.type === 'normal' ? 'bg-emerald-50 text-emerald-600' :
-                    mission.type === 'challenge' ? 'bg-orange-50 text-orange-600' :
-                    'bg-rose-50 text-rose-600'
-                  }`}>
-                    {mission.type === 'normal' ? <CheckCircle size={36} /> :
-                     mission.type === 'challenge' ? <Flame size={36} /> :
-                     <Trophy size={36} />}
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-3 mb-2">
-                       <span className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest ${
-                         mission.type === 'normal' ? 'bg-emerald-100 text-emerald-700' :
-                         mission.type === 'challenge' ? 'bg-orange-100 text-orange-700' :
-                         'bg-rose-100 text-rose-700'
-                       }`}>
-                         {mission.type === 'normal' ? '一般任務' : mission.type === 'challenge' ? '挑戰任務 (1.5x)' : '困難任務 (2.0x)'}
-                       </span>
+          {missions.map(mission => {
+            const isCompleted = hasCompletedMission(user.id, mission.id);
+            return (
+              <div
+                key={mission.id}
+                className={`bg-white border-2 border-slate-50 p-8 rounded-[2.5rem] transition-all group relative overflow-hidden ${isCompleted ? 'opacity-60 grayscale' : 'shadow-sm hover:shadow-xl'
+                  } ${mission.id === completingId ? 'animate-pulse' : ''}`}
+              >
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-8">
+                  <div className="flex gap-8 items-start">
+                    <div className={`w-20 h-20 rounded-3xl flex items-center justify-center shrink-0 shadow-inner ${mission.type === 'normal' ? 'bg-emerald-50 text-emerald-600' :
+                        mission.type === 'challenge' ? 'bg-orange-50 text-orange-600' :
+                          'bg-rose-50 text-rose-600'
+                      }`}>
+                      {isCompleted ? <CheckCircle size={36} /> : (
+                        mission.type === 'normal' ? <Target size={36} /> :
+                          mission.type === 'challenge' ? <Flame size={36} /> :
+                            <Trophy size={36} />
+                      )}
                     </div>
-                    <h3 className="text-2xl font-black text-slate-800 group-hover:text-indigo-600 transition-colors">{mission.title}</h3>
-                    <p className="text-slate-500 mt-2 leading-relaxed text-lg font-medium max-w-2xl">{mission.description}</p>
+                    <div>
+                      <div className="flex items-center gap-3 mb-2">
+                        <span className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest ${mission.type === 'normal' ? 'bg-emerald-100 text-emerald-700' :
+                            mission.type === 'challenge' ? 'bg-orange-100 text-orange-700' :
+                              'bg-rose-100 text-rose-700'
+                          }`}>
+                          {mission.type === 'normal' ? '一般任務' : mission.type === 'challenge' ? '挑戰任務' : '困難任務'}
+                        </span>
+                      </div>
+                      <h3 className="text-2xl font-black text-slate-800 transition-colors">{mission.title}</h3>
+                      <p className="text-slate-500 mt-2 leading-relaxed text-lg font-medium max-w-2xl">{mission.description}</p>
+                    </div>
                   </div>
-                </div>
 
-                <div className="flex flex-col md:items-end gap-6 shrink-0">
-                  <div className="flex flex-col items-end">
-                    <span className="text-xs font-bold text-slate-400 mb-1 uppercase tracking-tighter">完成獎勵點數</span>
-                    <div className="flex items-baseline gap-2">
-                      <span className="text-4xl font-black text-indigo-600 tracking-tighter">
-                        {Math.round(mission.points * mission.multiplier)}
-                      </span>
-                      <span className="text-sm font-bold text-slate-400">PTS</span>
+                  <div className="flex flex-col md:items-end gap-6 shrink-0">
+                    <div className="flex flex-col items-end">
+                      <span className="text-xs font-bold text-slate-400 mb-1 uppercase tracking-tighter">完成獎勵點數</span>
+                      <div className="flex items-baseline gap-2">
+                        <span className="text-4xl font-black text-indigo-600 tracking-tighter">
+                          {mission.points}
+                        </span>
+                        <span className="text-sm font-bold text-slate-400">PTS</span>
+                      </div>
                     </div>
+                    <button
+                      onClick={() => handleCompleteMission(mission)}
+                      disabled={completingId !== null || isCompleted}
+                      className={`px-10 py-5 rounded-2xl font-black transition-all flex items-center gap-3 shadow-xl ${isCompleted
+                          ? 'bg-slate-200 text-slate-500 cursor-not-allowed shadow-none'
+                          : (mission.type === 'normal' ? 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-100' :
+                            mission.type === 'challenge' ? 'bg-orange-600 hover:bg-orange-700 shadow-orange-100' :
+                              'bg-rose-600 hover:bg-rose-700 shadow-rose-100')
+                        } text-white text-lg active:scale-95 disabled:active:scale-100`}
+                    >
+                      {isCompleted ? '已完成' : completingId === mission.id ? '提交結果中...' : '提交任務結果'}
+                      {!isCompleted && <ChevronRight size={20} />}
+                    </button>
                   </div>
-                  <button 
-                    onClick={() => handleCompleteMission(mission)}
-                    disabled={completingId !== null}
-                    className={`px-10 py-5 rounded-2xl font-black transition-all flex items-center gap-3 shadow-xl ${
-                      mission.type === 'normal' ? 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-100' :
-                      mission.type === 'challenge' ? 'bg-orange-600 hover:bg-orange-700 shadow-orange-100' :
-                      'bg-rose-600 hover:bg-rose-700 shadow-rose-100'
-                    } text-white text-lg active:scale-95 disabled:grayscale disabled:opacity-50`}
-                  >
-                    {completingId === mission.id ? '提交結果中...' : '提交任務結果'}
-                    <ChevronRight size={20} />
-                  </button>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </section>
     </div>
