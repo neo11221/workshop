@@ -455,50 +455,86 @@ export const likeWish = async (wishId: string) => {
 // --- Real-time listeners ---
 
 export const subscribeToStudents = (callback: (students: UserProfile[]) => void): Unsubscribe => {
-  return onSnapshot(collection(db, COLLECTIONS.STUDENTS), (snapshot) => {
-    const students = snapshot.docs.map((doc) => ({ ...doc.data(), id: doc.id }) as UserProfile);
-    callback(students);
-  });
+  return onSnapshot(
+    collection(db, COLLECTIONS.STUDENTS),
+    (snapshot) => {
+      const students = snapshot.docs.map((doc) => ({ ...doc.data(), id: doc.id }) as UserProfile);
+      callback(students);
+    },
+    (error) => {
+      console.error('Error in subscribeToStudents:', error);
+      // alert('無法讀取學生資料！請檢查 Firestore 權限規則');
+    }
+  );
 };
 
 export const subscribeToMissions = (callback: (missions: Mission[]) => void): Unsubscribe => {
-  return onSnapshot(collection(db, COLLECTIONS.MISSIONS), (snapshot) => {
-    const missions = snapshot.docs.map((doc) => ({ ...doc.data(), id: doc.id }) as Mission);
-    callback(missions);
-  });
+  return onSnapshot(
+    collection(db, COLLECTIONS.MISSIONS),
+    (snapshot) => {
+      if (snapshot.empty) {
+        initializeMissions().catch(console.error);
+      }
+      const missions = snapshot.docs.map((doc) => ({ ...doc.data(), id: doc.id }) as Mission);
+      callback(missions);
+    },
+    (error) => console.error('Error subscribing to missions:', error)
+  );
 };
 
 export const subscribeToProducts = (callback: (products: Product[]) => void): Unsubscribe => {
-  return onSnapshot(collection(db, COLLECTIONS.PRODUCTS), (snapshot) => {
-    const products = snapshot.docs.map((doc) => ({ ...doc.data(), id: doc.id }) as Product);
-    callback(products);
-  });
+  return onSnapshot(
+    collection(db, COLLECTIONS.PRODUCTS),
+    (snapshot) => {
+      if (snapshot.empty) {
+        // Auto-initialize if empty
+        initializeProducts().catch(console.error);
+      }
+      const products = snapshot.docs.map((doc) => ({ ...doc.data(), id: doc.id }) as Product);
+      callback(products);
+    },
+    (error) => {
+      console.error('Error subscribing to products:', error);
+      alert('無法讀取商品列表（權限不足或連線失敗）');
+    }
+  );
 };
 
 export const subscribeToWishes = (callback: (wishes: Wish[]) => void): Unsubscribe => {
-  return onSnapshot(collection(db, COLLECTIONS.WISHES), (snapshot) => {
-    const wishes = snapshot.docs.map((doc) => ({ ...doc.data(), id: doc.id }) as Wish);
-    callback(wishes);
-  });
+  return onSnapshot(
+    collection(db, COLLECTIONS.WISHES),
+    (snapshot) => {
+      const wishes = snapshot.docs.map((doc) => ({ ...doc.data(), id: doc.id }) as Wish);
+      callback(wishes);
+    },
+    (error) => console.error('Error subscribing to wishes:', error)
+  );
 };
 
 export const subscribeToRedemptions = (
   callback: (redemptions: Redemption[]) => void
 ): Unsubscribe => {
-  return onSnapshot(collection(db, COLLECTIONS.REDEMPTIONS), (snapshot) => {
-    const redemptions = snapshot.docs.map((doc) => {
-      const data = doc.data();
-      return {
-        id: doc.id,
-        status: 'pending',
-        pointsSpent: 0,
-        productName: '未知商品',
-        timestamp: Date.now(),
-        userId: 'unknown',
-        qrCodeData: '',
-        ...data
-      } as Redemption;
-    });
-    callback(redemptions);
-  });
+  return onSnapshot(
+    collection(db, COLLECTIONS.REDEMPTIONS),
+    (snapshot) => {
+      const redemptions = snapshot.docs.map((doc) => {
+        const data = doc.data();
+        // Defensive coding for potentially missing fields
+        return {
+          id: doc.id,
+          status: 'pending',
+          pointsSpent: 0,
+          productName: '未知商品',
+          timestamp: Date.now(),
+          userId: 'unknown',
+          qrCodeData: '',
+          ...data
+        } as Redemption;
+      });
+      callback(redemptions);
+    },
+    (error) => {
+      console.error('Error subscribing to redemptions:', error);
+    }
+  );
 };

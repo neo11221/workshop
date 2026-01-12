@@ -552,39 +552,46 @@ const Admin: React.FC<AdminProps> = ({ onRefresh }) => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
-                {filteredRedemptions.map(r => (
-                  <tr key={r.id} className="hover:bg-slate-50/50 transition-colors">
-                    <td className="px-10 py-6 whitespace-nowrap">
-                      <span className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest ${r.status === 'completed' ? 'bg-emerald-100 text-emerald-700' :
-                        r.status === 'pending' ? 'bg-amber-100 text-amber-700' : 'bg-rose-100 text-rose-700'
-                        }`}>
-                        {r.status === 'completed' ? '已核銷' : r.status === 'pending' ? '待處理' : '已取消'}
-                      </span>
-                    </td>
-                    <td className="px-10 py-6 whitespace-nowrap font-black text-slate-800">
-                      {students.find(s => s.id === r.userId)?.name || '未知學員'}
-                    </td>
-                    <td className="px-10 py-6 whitespace-nowrap font-bold text-slate-600">{r.productName}</td>
-                    <td className="px-10 py-6 whitespace-nowrap text-indigo-600 font-black">{r.pointsSpent} PTS</td>
-                    <td className="px-10 py-6 whitespace-nowrap text-slate-400 text-sm font-bold">
-                      {new Date(r.timestamp).toLocaleDateString()}
-                    </td>
-                    <td className="px-10 py-6 whitespace-nowrap">
-                      {r.status === 'pending' ? (
-                        <button
-                          onClick={() => handleConfirmRedemption(r.id)}
-                          className="text-white bg-indigo-600 hover:bg-indigo-700 px-5 py-2.5 rounded-xl text-xs font-black transition-all shadow-xl shadow-indigo-100 active:scale-95"
-                        >
-                          立即核銷
-                        </button>
-                      ) : (
-                        <div className="flex items-center gap-2 text-slate-300 font-black text-[10px] tracking-widest">
-                          <Check size={14} /> FINISHED
-                        </div>
-                      )}
-                    </td>
-                  </tr>
-                ))}
+                {filteredRedemptions.map(r => {
+                  try {
+                    return (
+                      <tr key={r.id} className="hover:bg-slate-50/50 transition-colors">
+                        <td className="px-10 py-6 whitespace-nowrap">
+                          <span className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest ${r.status === 'completed' ? 'bg-emerald-100 text-emerald-700' :
+                            r.status === 'pending' ? 'bg-amber-100 text-amber-700' : 'bg-rose-100 text-rose-700'
+                            }`}>
+                            {r.status === 'completed' ? '已核銷' : r.status === 'pending' ? '待處理' : '已取消'}
+                          </span>
+                        </td>
+                        <td className="px-10 py-6 whitespace-nowrap font-black text-slate-800">
+                          {students.find(s => s.id === r.userId)?.name || '未知學員'}
+                        </td>
+                        <td className="px-10 py-6 whitespace-nowrap font-bold text-slate-600">{r.productName}</td>
+                        <td className="px-10 py-6 whitespace-nowrap text-indigo-600 font-black">{r.pointsSpent} PTS</td>
+                        <td className="px-10 py-6 whitespace-nowrap text-slate-400 text-sm font-bold">
+                          {r.timestamp ? new Date(r.timestamp).toLocaleDateString() : '無日期'}
+                        </td>
+                        <td className="px-10 py-6 whitespace-nowrap">
+                          {r.status === 'pending' ? (
+                            <button
+                              onClick={() => handleConfirmRedemption(r.id)}
+                              className="text-white bg-indigo-600 hover:bg-indigo-700 px-5 py-2.5 rounded-xl text-xs font-black transition-all shadow-xl shadow-indigo-100 active:scale-95"
+                            >
+                              立即核銷
+                            </button>
+                          ) : (
+                            <div className="flex items-center gap-2 text-slate-300 font-black text-[10px] tracking-widest">
+                              <Check size={14} /> FINISHED
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  } catch (err) {
+                    console.error("Row render error", err);
+                    return null;
+                  }
+                })}
               </tbody>
             </table>
           </div>
