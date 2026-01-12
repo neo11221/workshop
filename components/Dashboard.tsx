@@ -4,7 +4,7 @@ import { Trophy, TrendingUp, Sparkles, CheckCircle, ChevronRight, Medal, Flame, 
 import { UserProfile, RankTitle, Mission } from '../types';
 import { RANKS } from '../constants';
 import { getEncouragement } from '../services/geminiService';
-import { saveUser, getMissions, hasCompletedMission, addChallengeHistory } from '../utils/storage';
+import { saveUser, hasCompletedMission, addChallengeHistory, subscribeToMissions } from '../utils/storage';
 
 interface DashboardProps {
   user: UserProfile;
@@ -26,19 +26,24 @@ const Dashboard: React.FC<DashboardProps> = ({ user, rank, onUserUpdate }) => {
     const fetchContent = async () => {
       const msg = await getEncouragement(user, rank);
       setMessage(msg);
-
-      const allMissions = getMissions();
-      // Filter only active missions
-      setMissions(allMissions.filter(m => m.isActive));
     };
     fetchContent();
+
+    // Subscribe to real-time missions updates
+    const unsubscribe = subscribeToMissions((allMissions) => {
+      // Filter only active missions
+      setMissions(allMissions.filter(m => m.isActive));
+    });
+
+    return () => unsubscribe();
   }, [user.id, rank]);
 
-  const handleCompleteMission = (mission: Mission) => {
+  const handleCompleteMission = async (mission: Mission) => {
     if (completingId) return;
 
     // Check if already completed
-    if (hasCompletedMission(user.id, mission.id)) {
+    const alreadyCompleted = await hasCompletedMission(user.id, mission.id);
+    if (alreadyCompleted) {
       alert('此任務已經完成過了喔！');
       return;
     }
@@ -47,9 +52,9 @@ const Dashboard: React.FC<DashboardProps> = ({ user, rank, onUserUpdate }) => {
 
     const finalPoints = mission.points;
 
-    setTimeout(() => {
+    setTimeout(async () => {
       // 1. Record Completion
-      addChallengeHistory({
+      await addChallengeHistory({
         id: `h_${Date.now()}`,
         userId: user.id,
         missionId: mission.id,
@@ -62,7 +67,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, rank, onUserUpdate }) => {
         points: user.points + finalPoints,
         totalEarned: user.totalEarned + finalPoints
       };
-      saveUser(updatedUser);
+      await saveUser(updatedUser);
       onUserUpdate();
       setCompletingId(null);
       alert(`🎉 恭喜完成任務！\n共獲得 ${finalPoints} 點。`);
@@ -175,7 +180,10 @@ const Dashboard: React.FC<DashboardProps> = ({ user, rank, onUserUpdate }) => {
 
         <div className="grid grid-cols-1 gap-6">
           {missions.map(mission => {
-            const isCompleted = hasCompletedMission(user.id, mission.id);
+            const [isCompleted, setIsCompleted] = React.useState(false);
+            React.useEffect(() => {
+              hasCompletedMission(user.id, mission.id).then(setIsCompleted);
+            }, [mission.id]);
             return (
               <div
                 key={mission.id}
@@ -185,8 +193,8 @@ const Dashboard: React.FC<DashboardProps> = ({ user, rank, onUserUpdate }) => {
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-8">
                   <div className="flex gap-8 items-start">
                     <div className={`w-20 h-20 rounded-3xl flex items-center justify-center shrink-0 shadow-inner ${mission.type === 'normal' ? 'bg-emerald-50 text-emerald-600' :
-                        mission.type === 'challenge' ? 'bg-orange-50 text-orange-600' :
-                          'bg-rose-50 text-rose-600'
+                      mission.type === 'challenge' ? 'bg-orange-50 text-orange-600' :
+                        'bg-rose-50 text-rose-600'
                       }`}>
                       {isCompleted ? <CheckCircle size={36} /> : (
                         mission.type === 'normal' ? <Target size={36} /> :
@@ -197,8 +205,8 @@ const Dashboard: React.FC<DashboardProps> = ({ user, rank, onUserUpdate }) => {
                     <div>
                       <div className="flex items-center gap-3 mb-2">
                         <span className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest ${mission.type === 'normal' ? 'bg-emerald-100 text-emerald-700' :
-                            mission.type === 'challenge' ? 'bg-orange-100 text-orange-700' :
-                              'bg-rose-100 text-rose-700'
+                          mission.type === 'challenge' ? 'bg-orange-100 text-orange-700' :
+                            'bg-rose-100 text-rose-700'
                           }`}>
                           {mission.type === 'normal' ? '一般任務' : mission.type === 'challenge' ? '挑戰任務' : '困難任務'}
                         </span>
@@ -222,10 +230,10 @@ const Dashboard: React.FC<DashboardProps> = ({ user, rank, onUserUpdate }) => {
                       onClick={() => handleCompleteMission(mission)}
                       disabled={completingId !== null || isCompleted}
                       className={`px-10 py-5 rounded-2xl font-black transition-all flex items-center gap-3 shadow-xl ${isCompleted
-                          ? 'bg-slate-200 text-slate-500 cursor-not-allowed shadow-none'
-                          : (mission.type === 'normal' ? 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-100' :
-                            mission.type === 'challenge' ? 'bg-orange-600 hover:bg-orange-700 shadow-orange-100' :
-                              'bg-rose-600 hover:bg-rose-700 shadow-rose-100')
+                        ? 'bg-slate-200 text-slate-500 cursor-not-allowed shadow-none'
+                        : (mission.type === 'normal' ? 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-100' :
+                          mission.type === 'challenge' ? 'bg-orange-600 hover:bg-orange-700 shadow-orange-100' :
+                            'bg-rose-600 hover:bg-rose-700 shadow-rose-100')
                         } text-white text-lg active:scale-95 disabled:active:scale-100`}
                     >
                       {isCompleted ? '已完成' : completingId === mission.id ? '提交結果中...' : '提交任務結果'}

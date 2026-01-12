@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ShoppingCart, AlertCircle, Check, X, Tag, Package } from 'lucide-react';
 import { Product, UserProfile, Redemption } from '../types';
-import { saveUser, addRedemption, getProducts, updateProductStock } from '../utils/storage';
+import { saveUser, addRedemption, updateProductStock, subscribeToProducts } from '../utils/storage';
 
 interface ShopProps {
   user: UserProfile;
@@ -14,12 +14,17 @@ const Shop: React.FC<ShopProps> = ({ user, onUserUpdate }) => {
   const [products, setProducts] = useState<Product[]>([]);
 
   useEffect(() => {
-    setProducts(getProducts());
-  }, [user]); // Refresh when user updates might be a good time, or just on mount.
+    // Subscribe to real-time products updates
+    const unsubscribe = subscribeToProducts((updatedProducts) => {
+      setProducts(updatedProducts);
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   const filteredProducts = products.filter(p => filter === 'all' || p.category === filter);
 
-  const handleRedeem = () => {
+  const handleRedeem = async () => {
     if (user.role === 'GUEST') {
       alert('訪客模式無法兌換商品，請登入學生帳號。');
       return;
@@ -42,14 +47,13 @@ const Shop: React.FC<ShopProps> = ({ user, onUserUpdate }) => {
       points: user.points - selectedProduct.price
     };
 
-    // Update storage
-    addRedemption(newRedemption);
-    saveUser(updatedUser);
-    updateProductStock(selectedProduct.id, 1);
+    // Update storage (async)
+    await addRedemption(newRedemption);
+    await saveUser(updatedUser);
+    await updateProductStock(selectedProduct.id, 1);
 
-    // Refresh local state
+    // Refresh
     onUserUpdate();
-    setProducts(getProducts()); // Refresh stock
     setSelectedProduct(null);
     alert('🎉 兌換成功！請前往兌換紀錄查看 QR Code。');
   };

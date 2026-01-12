@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Camera, ShieldCheck, Check, Search, X, ScanLine, Gift, History as HistoryIcon, GraduationCap, Users, UserPlus, Package, Plus, Target } from 'lucide-react';
 import { Redemption, UserProfile, Product, UserRole, Mission } from '../types';
-import { getRedemptions, updateRedemptionStatus, getStudents, saveStudents, approveStudent, deleteStudent, getProducts, addProduct, updateProductStock, getMissions, addMission, toggleMission } from '../utils/storage';
+import { updateRedemptionStatus, approveStudent, deleteStudent, addProduct, addMission, toggleMission, saveStudents, subscribeToStudents, subscribeToRedemptions, subscribeToProducts, subscribeToMissions } from '../utils/storage';
 import { RANKS } from '../constants';
 
 interface AdminProps {
@@ -39,23 +39,29 @@ const Admin: React.FC<AdminProps> = ({ onRefresh }) => {
   const [isAddingProduct, setIsAddingProduct] = useState(false);
 
   useEffect(() => {
-    refreshData();
-  }, [activeTab]);
+    // Subscribe to all data with real-time updates
+    const unsubStudents = subscribeToStudents((allStudents) => {
+      setStudents(allStudents.filter(s => s.role === UserRole.STUDENT && s.isApproved));
+      setPendingStudents(allStudents.filter(s => s.role === UserRole.STUDENT && !s.isApproved));
 
-  const refreshData = () => {
-    setRedemptions(getRedemptions());
-    const allStudents = getStudents();
-    setStudents(allStudents.filter(s => s.role === UserRole.STUDENT && s.isApproved));
-    setPendingStudents(allStudents.filter(s => s.role === UserRole.STUDENT && !s.isApproved));
-    setProducts(getProducts());
-    setMissions(getMissions());
+      // Set default student for points tab
+      const approved = allStudents.filter(s => s.role === UserRole.STUDENT && s.isApproved);
+      if (approved.length > 0 && !targetStudentId) {
+        setTargetStudentId(approved[0].id);
+      }
+    });
 
-    // 預設選擇第一位同學
-    const approved = allStudents.filter(s => s.role === UserRole.STUDENT && s.isApproved);
-    if (approved.length > 0 && !targetStudentId) {
-      setTargetStudentId(approved[0].id);
-    }
-  };
+    const unsubRedemptions = subscribeToRedemptions(setRedemptions);
+    const unsubProducts = subscribeToProducts(setProducts);
+    const unsubMissions = subscribeToMissions(setMissions);
+
+    return () => {
+      unsubStudents();
+      unsubRedemptions();
+      unsubProducts();
+      unsubMissions();
+    };
+  }, []);
 
   const handleStartScan = async () => {
     setIsScanning(true);
@@ -70,15 +76,14 @@ const Admin: React.FC<AdminProps> = ({ onRefresh }) => {
     }, 2000);
   };
 
-  const handleConfirmRedemption = (id: string) => {
-    updateRedemptionStatus(id, 'completed');
-    setRedemptions(getRedemptions());
+  const handleConfirmRedemption = async (id: string) => {
+    await updateRedemptionStatus(id, 'completed');
     setScanResult(null);
     onRefresh();
     alert('✅ 核銷成功！商品已發放。');
   };
 
-  const handleIssuePoints = () => {
+  const handleIssuePoints = async () => {
     const amount = parseInt(pointAmount);
     if (isNaN(amount) || !targetStudentId) return;
 
@@ -93,28 +98,25 @@ const Admin: React.FC<AdminProps> = ({ onRefresh }) => {
       return s;
     });
 
-    saveStudents(updatedStudents);
-    refreshData();
+    await saveStudents(updatedStudents);
     onRefresh();
     const studentName = students.find(s => s.id === targetStudentId)?.name;
     alert(`✅ 已成功為 ${studentName} 發放 ${amount} 點！\n原因：${reason}`);
     setPointAmount('');
   };
 
-  const handleApprove = (id: string) => {
-    approveStudent(id);
-    refreshData();
+  const handleApprove = async (id: string) => {
+    await approveStudent(id);
     alert('已核准學生加入！');
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (confirm('確定要拒絕/刪除此申請嗎？')) {
-      deleteStudent(id);
-      refreshData();
+      await deleteStudent(id);
     }
   };
 
-  const handleAddProduct = (e: React.FormEvent) => {
+  const handleAddProduct = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newProductName || !newProductPrice || !newProductStock) return;
 
@@ -128,8 +130,7 @@ const Admin: React.FC<AdminProps> = ({ onRefresh }) => {
       imageUrl: newProductImage || 'https://images.unsplash.com/photo-1553456558-aff63285bdd1?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.0.3'
     };
 
-    addProduct(newProduct);
-    refreshData();
+    await addProduct(newProduct);
     setIsAddingProduct(false);
     setNewProductName('');
     setNewProductPrice('');
@@ -138,7 +139,7 @@ const Admin: React.FC<AdminProps> = ({ onRefresh }) => {
     alert('商品上架成功！');
   };
 
-  const handleAddMission = (e: React.FormEvent) => {
+  const handleAddMission = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newMissionTitle || !newMissionPoints) return;
 
@@ -152,8 +153,7 @@ const Admin: React.FC<AdminProps> = ({ onRefresh }) => {
       maxAttempts: 1
     };
 
-    addMission(newMission);
-    refreshData();
+    await addMission(newMission);
     setIsAddingMission(false);
     setNewMissionTitle('');
     setNewMissionPoints('');
@@ -161,9 +161,8 @@ const Admin: React.FC<AdminProps> = ({ onRefresh }) => {
     alert('任務新增成功！');
   };
 
-  const handleToggleMission = (id: string) => {
-    toggleMission(id);
-    refreshData();
+  const handleToggleMission = async (id: string) => {
+    await toggleMission(id);
   };
 
   const handleUpdateStock = (id: string, newStock: number) => {
@@ -661,8 +660,8 @@ const Admin: React.FC<AdminProps> = ({ onRefresh }) => {
               <div key={mission.id} className={`flex flex-col md:flex-row md:items-center justify-between p-6 rounded-2xl border transition-all ${mission.isActive ? 'bg-white border-slate-100 shadow-sm' : 'bg-slate-50 border-slate-100 opacity-60'}`}>
                 <div className="flex items-center gap-4 mb-4 md:mb-0">
                   <div className={`w-12 h-12 rounded-xl flex items-center justify-center font-black text-lg shrink-0 ${mission.type === 'normal' ? 'bg-emerald-100 text-emerald-600' :
-                      mission.type === 'challenge' ? 'bg-orange-100 text-orange-600' :
-                        'bg-rose-100 text-rose-600'
+                    mission.type === 'challenge' ? 'bg-orange-100 text-orange-600' :
+                      'bg-rose-100 text-rose-600'
                     }`}>
                     {mission.type === 'normal' ? 'N' : mission.type === 'challenge' ? 'C' : 'H'}
                   </div>
@@ -680,8 +679,8 @@ const Admin: React.FC<AdminProps> = ({ onRefresh }) => {
                 <button
                   onClick={() => handleToggleMission(mission.id)}
                   className={`px-4 py-2 rounded-xl font-black text-xs transition-all whitespace-nowrap ${mission.isActive
-                      ? 'bg-rose-50 text-rose-600 hover:bg-rose-100'
-                      : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100'
+                    ? 'bg-rose-50 text-rose-600 hover:bg-rose-100'
+                    : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100'
                     }`}
                 >
                   {mission.isActive ? '停用任務' : '啟用任務'}

@@ -18,9 +18,9 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
     const [adminPass, setAdminPass] = useState('');
     const [guestCode, setGuestCode] = useState('');
 
-    const handleStudentLogin = (e: React.FormEvent) => {
+    const handleStudentLogin = async (e: React.FormEvent) => {
         e.preventDefault();
-        const students = getStudents();
+        const students = await getStudents();
         const user = students.find(s => s.name === name);
 
         if (!user) {
@@ -38,14 +38,14 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
             return;
         }
 
-        saveUser(user);
+        await saveUser(user);
         alert('登入成功！');
         onLogin(user);
     };
 
-    const handleRegister = (e: React.FormEvent) => {
+    const handleRegister = async (e: React.FormEvent) => {
         e.preventDefault();
-        const success = registerStudent(name, password, grade);
+        const success = await registerStudent(name, password, grade);
         if (success) {
             alert('註冊申請已送出！請通知導師審核。');
             setIsRegistering(false);

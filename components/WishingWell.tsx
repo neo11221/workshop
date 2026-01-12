@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Heart, Plus, Sparkles, Send, X, ThumbsUp } from 'lucide-react';
 import { UserProfile, Wish } from '../types';
-import { getWishes, addWish, likeWish } from '../utils/storage';
+import { addWish, likeWish, subscribeToWishes } from '../utils/storage';
 
 interface WishingWellProps {
     user: UserProfile;
@@ -14,12 +14,15 @@ const WishingWell: React.FC<WishingWellProps> = ({ user }) => {
     const [description, setDescription] = useState('');
 
     useEffect(() => {
-        setWishes(getWishes());
-    }, [user]); // Reload when user changes, just in case
+        // Subscribe to real-time wishes updates
+        const unsubscribe = subscribeToWishes((updatedWishes) => {
+            setWishes(updatedWishes.sort((a, b) => b.timestamp - a.timestamp));
+        });
 
-    const refreshWishes = () => setWishes(getWishes());
+        return () => unsubscribe();
+    }, []);
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!itemName.trim() || !description.trim()) return;
 
@@ -34,16 +37,14 @@ const WishingWell: React.FC<WishingWellProps> = ({ user }) => {
             likes: 0
         };
 
-        addWish(newWish);
+        await addWish(newWish);
         setIsAdding(false);
         setItemName('');
         setDescription('');
-        refreshWishes();
     };
 
-    const handleLike = (wishId: string) => {
-        likeWish(wishId);
-        refreshWishes();
+    const handleLike = async (wishId: string) => {
+        await likeWish(wishId);
     };
 
     return (

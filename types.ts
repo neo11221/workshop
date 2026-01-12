@@ -26,6 +26,9 @@ export interface User {
   isApproved?: boolean;
 }
 
+// Alias for backward compatibility
+export type UserProfile = User;
+
 export interface Redemption {
   id: string;
   userId: string;
