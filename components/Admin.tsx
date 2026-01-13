@@ -25,6 +25,11 @@ const Admin: React.FC<AdminProps> = ({ onRefresh }) => {
   const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().substring(0, 7)); // YYYY-MM
   const [scanInput, setScanInput] = useState('');
   const [scanResult, setScanResult] = useState<Redemption | null>(null);
+  const redemptionsRef = React.useRef(redemptions);
+
+  React.useEffect(() => {
+    redemptionsRef.current = redemptions;
+  }, [redemptions]);
 
   // New Mission States
   const [newMissionTitle, setNewMissionTitle] = useState('');
@@ -95,13 +100,12 @@ const Admin: React.FC<AdminProps> = ({ onRefresh }) => {
 
       scanner.render(
         (decodedText) => {
-          setScanInput(decodedText);
-          // 如果掃描到內容，可以自動觸發比對
-          // handleStartScan(decodedText); 
+          if (decodedText) {
+            // 自動觸發比對邏輯
+            handleAutoVerify(decodedText);
+          }
         },
-        () => {
-          // 忽略掃描錯誤
-        }
+        () => { }
       );
     }
 
@@ -114,11 +118,22 @@ const Admin: React.FC<AdminProps> = ({ onRefresh }) => {
     };
   }, [activeTab]);
 
+  const handleAutoVerify = (code: string) => {
+    // 如果已經有結果在處理中，不重複觸發
+    if (scanResult) return;
+
+    // 立即檢查
+    const match = redemptionsRef.current.find(r => r.qrCodeData === code && r.status === 'pending');
+    if (match) {
+      setScanResult(match);
+    }
+  };
+
   const handleStartScan = async (forcedCode?: string) => {
     const codeToVerify = typeof forcedCode === 'string' ? forcedCode : scanInput;
 
     if (!codeToVerify) {
-      alert('請先輸入代碼或使用上方掃描器');
+      alert('請輸入代碼或對準攝像頭');
       return;
     }
 
@@ -133,7 +148,7 @@ const Admin: React.FC<AdminProps> = ({ onRefresh }) => {
         alert('❌ 無效的兌換碼或該商品已核銷');
       }
       setIsScanning(false);
-    }, 1500);
+    }, 800); // 縮短模擬時間
   };
 
   const handleConfirmRedemption = async (id: string) => {
