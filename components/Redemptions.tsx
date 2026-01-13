@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { QrCode, Calendar, Clock, CheckCircle2, AlertCircle, X, History } from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
 import { Redemption, UserProfile } from '../types';
 import { subscribeToRedemptions } from '../utils/storage';
 
@@ -118,13 +119,14 @@ const Redemptions: React.FC<{ user: UserProfile }> = ({ user }) => {
             <h2 className="text-2xl font-bold text-slate-800 mb-2">出示兌換</h2>
             <p className="text-slate-500 mb-8 text-sm">請將此碼向管理員展示進行掃描</p>
 
-            <div className="aspect-square bg-white border-8 border-indigo-50 rounded-3xl flex items-center justify-center mb-8 shadow-inner overflow-hidden">
-              <svg width="200" height="200" viewBox="0 0 200 200" className="w-full h-full p-4">
-                <rect x="0" y="0" width="200" height="200" fill="white" />
-                <path d="M20 20h60v60h-60zM40 40h20v20h-20zM120 20h60v60h-60zM140 40h20v20h-20zM20 120h60v60h-60zM40 140h20v20h-20zM120 120h60v60h-60zM140 140h20v20h-20z" fill="#4f46e5" />
-                <path d="M90 20h20v20h-20zM20 90h20v20h-20zM170 90h10v10h-10zM110 170h10v10h-10zM50 110h10v10h-10zM90 90h20v20h-20zM120 90h10v10h-10z" fill="#4f46e5" />
-                <rect x="70" y="70" width="60" height="60" rx="10" fill="#4f46e5" className="opacity-20" />
-              </svg>
+            <div className="aspect-square bg-white border-8 border-indigo-50 rounded-3xl flex items-center justify-center mb-8 shadow-inner overflow-hidden p-6">
+              <QRCodeSVG
+                value={viewingRedemption.qrCodeData}
+                size={256}
+                level="H"
+                includeMargin={false}
+                className="w-full h-full"
+              />
             </div>
 
             <div className="bg-slate-50 p-4 rounded-2xl text-slate-400 font-mono text-xs mb-8 tracking-widest uppercase">

@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Camera, ShieldCheck, Check, Search, X, ScanLine, Gift, History as HistoryIcon, GraduationCap, Users, UserPlus, Package, Plus, Target, Clock, Trash2, Heart, CheckCircle } from 'lucide-react';
+import { Html5QrcodeScanner } from 'html5-qrcode';
 import { Redemption, UserProfile, Product, UserRole, Mission, PointReason, Wish, MissionSubmission } from '../types';
 import { updateRedemptionStatus, approveStudent, deleteStudent, addProduct, addMission, toggleMission, saveStudents, subscribeToStudents, subscribeToRedemptions, subscribeToProducts, subscribeToMissions, deleteProduct, addPointReason, deletePointReason, subscribeToPointReasons, subscribeToWishes, deleteWish, subscribeToMissionSubmissions, approveMission, rejectMission, updateProductStock } from '../utils/storage';
 import { RANKS } from '../constants';
@@ -78,20 +79,56 @@ const Admin: React.FC<AdminProps> = ({ onRefresh }) => {
     };
   }, [targetStudentId]);
 
-  const handleStartScan = async () => {
-    if (!scanInput) {
-      alert('請先輸入或貼上 QR Code 代碼字串');
+  useEffect(() => {
+    let scanner: Html5QrcodeScanner | null = null;
+
+    if (activeTab === 'scan') {
+      scanner = new Html5QrcodeScanner(
+        'reader',
+        {
+          fps: 10,
+          qrbox: { width: 250, height: 250 },
+          aspectRatio: 1.0
+        },
+        false
+      );
+
+      scanner.render(
+        (decodedText) => {
+          setScanInput(decodedText);
+          // 如果掃描到內容，可以自動觸發比對
+          // handleStartScan(decodedText); 
+        },
+        () => {
+          // 忽略掃描錯誤
+        }
+      );
+    }
+
+    return () => {
+      if (scanner) {
+        scanner.clear().catch(error => {
+          console.error("Failed to clear scanner", error);
+        });
+      }
+    };
+  }, [activeTab]);
+
+  const handleStartScan = async (forcedCode?: string) => {
+    const codeToVerify = typeof forcedCode === 'string' ? forcedCode : scanInput;
+
+    if (!codeToVerify) {
+      alert('請先輸入代碼或使用上方掃描器');
       return;
     }
 
     setIsScanning(true);
     setTimeout(() => {
-      // 改為根據輸入的代碼精確查找
-      const match = redemptions.find(r => r.qrCodeData === scanInput && r.status === 'pending');
+      const match = redemptions.find(r => r.qrCodeData === codeToVerify && r.status === 'pending');
 
       if (match) {
         setScanResult(match);
-        setScanInput(''); // 成功後清空輸入
+        setScanInput('');
       } else {
         alert('❌ 無效的兌換碼或該商品已核銷');
       }
@@ -722,21 +759,30 @@ const Admin: React.FC<AdminProps> = ({ onRefresh }) => {
           <div className="bg-indigo-50 w-32 h-32 rounded-[2.5rem] flex items-center justify-center mx-auto mb-8 text-indigo-600 shadow-inner">
             <Camera size={56} />
           </div>
-          <h2 className="text-3xl font-black text-slate-800 mb-4 tracking-tight">啟動兌換掃描器</h2>
-          <p className="text-slate-400 mb-8 font-medium max-w-md mx-auto leading-relaxed">請掃描學員手機顯示的 QR Code 或手動輸入代碼進行核銷。</p>
+          <h2 className="text-3xl font-black text-slate-800 mb-4 tracking-tight">啟動攝像頭掃描器</h2>
+          <p className="text-slate-400 mb-8 font-medium max-w-md mx-auto leading-relaxed">請將學員手機顯示的 QR Code 對準下方掃描區域。</p>
+
+          <div className="max-w-md mx-auto mb-8 overflow-hidden rounded-[2rem] border-4 border-indigo-50 shadow-inner">
+            <div id="reader" className="w-full"></div>
+          </div>
 
           <div className="max-w-md mx-auto mb-8">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="h-px bg-slate-200 flex-1"></div>
+              <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest">或手動輸入對應字串</span>
+              <div className="h-px bg-slate-200 flex-1"></div>
+            </div>
             <input
               type="text"
-              placeholder="請輸入或貼上 QR Code 代碼 (例如: AUTH_WORKSHOP_...)"
+              placeholder="貼上 QR Code 代碼..."
               value={scanInput}
               onChange={(e) => setScanInput(e.target.value)}
-              className="w-full p-5 bg-slate-50 border-2 border-indigo-100 rounded-2xl focus:bg-white focus:border-indigo-600 focus:ring-4 focus:ring-indigo-100 transition-all outline-none font-mono text-xs text-slate-600 shadow-inner"
+              className="w-full p-4 bg-slate-50 border-2 border-indigo-50 rounded-2xl focus:bg-white focus:border-indigo-600 outline-none font-mono text-xs text-slate-500 text-center"
             />
           </div>
 
           <button
-            onClick={handleStartScan}
+            onClick={() => handleStartScan()}
             disabled={isScanning}
             className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 text-white px-16 py-6 rounded-[2rem] font-black transition-all shadow-2xl shadow-indigo-200 inline-flex items-center justify-center gap-4 text-xl active:scale-95"
           >
