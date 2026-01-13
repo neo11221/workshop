@@ -21,6 +21,7 @@ const Admin: React.FC<AdminProps> = ({ onRefresh }) => {
   const [wishes, setWishes] = useState<Wish[]>([]);
   const [submissions, setSubmissions] = useState<MissionSubmission[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().substring(0, 7)); // YYYY-MM
   const [scanResult, setScanResult] = useState<Redemption | null>(null);
 
   // New Mission States
@@ -223,10 +224,16 @@ const Admin: React.FC<AdminProps> = ({ onRefresh }) => {
     }
   };
 
-  const filteredRedemptions = redemptions.filter(r =>
-    (r.productName?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
-    (r.id?.toLowerCase() || '').includes(searchTerm.toLowerCase())
-  );
+  const filteredRedemptions = redemptions.filter(r => {
+    const matchesSearch = (r.productName?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+      (r.id?.toLowerCase() || '').includes(searchTerm.toLowerCase());
+
+    const redemptionDate = new Date(r.timestamp);
+    const redemptionMonth = `${redemptionDate.getFullYear()}-${String(redemptionDate.getMonth() + 1).padStart(2, '0')}`;
+    const matchesMonth = redemptionMonth === selectedMonth;
+
+    return matchesSearch && matchesMonth;
+  });
 
   const getRank = (totalEarned: number) => {
     return RANKS.reduce((prev, curr) => {
@@ -725,15 +732,25 @@ const Admin: React.FC<AdminProps> = ({ onRefresh }) => {
               <HistoryIcon className="text-indigo-600" />
               全體兌換日誌
             </h2>
-            <div className="relative">
-              <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
-              <input
-                type="text"
-                placeholder="搜尋學生、商品或流水號..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-14 pr-8 py-4 rounded-2xl bg-slate-50 border-2 border-transparent focus:bg-white focus:border-indigo-600 focus:ring-4 focus:ring-indigo-100 transition-all outline-none text-sm w-full md:w-96 shadow-inner font-bold"
-              />
+            <div className="flex flex-col md:flex-row gap-4 items-center">
+              <div className="relative">
+                <input
+                  type="month"
+                  value={selectedMonth}
+                  onChange={(e) => setSelectedMonth(e.target.value)}
+                  className="pl-5 pr-5 py-4 rounded-2xl bg-slate-50 border-2 border-transparent focus:bg-white focus:border-indigo-600 focus:ring-4 focus:ring-indigo-100 transition-all outline-none text-sm font-bold shadow-inner"
+                />
+              </div>
+              <div className="relative">
+                <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
+                <input
+                  type="text"
+                  placeholder="搜尋學生、商品或流水號..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-14 pr-8 py-4 rounded-2xl bg-slate-50 border-2 border-transparent focus:bg-white focus:border-indigo-600 focus:ring-4 focus:ring-indigo-100 transition-all outline-none text-sm w-full md:w-80 shadow-inner font-bold"
+                />
+              </div>
             </div>
           </div>
 
