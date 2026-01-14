@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { ShoppingCart, AlertCircle, Check, X, Tag, Package } from 'lucide-react';
 import { Product, UserProfile, Redemption, ProductCategory } from '../types';
 import { saveUser, addRedemption, updateProductStock, subscribeToProducts, subscribeToProductCategories } from '../utils/storage';
+import { useAlert } from './AlertProvider';
 
 interface ShopProps {
   user: UserProfile;
@@ -9,6 +10,7 @@ interface ShopProps {
 }
 
 const Shop: React.FC<ShopProps> = ({ user, onUserUpdate }) => {
+  const { showAlert } = useAlert();
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [filter, setFilter] = useState<string>('all');
   const [products, setProducts] = useState<Product[]>([]);
@@ -34,7 +36,7 @@ const Shop: React.FC<ShopProps> = ({ user, onUserUpdate }) => {
 
   const handleRedeem = async () => {
     if (user.role === 'GUEST') {
-      alert('訪客模式無法兌換商品，請登入學生帳號。');
+      showAlert('訪客模式無法兌換商品，請登入學生帳號。', 'info');
       return;
     }
     if (!selectedProduct || user.points < selectedProduct.price || selectedProduct.stock <= 0) return;
@@ -63,7 +65,7 @@ const Shop: React.FC<ShopProps> = ({ user, onUserUpdate }) => {
     // Refresh
     onUserUpdate();
     setSelectedProduct(null);
-    alert('🎉 兌換成功！請前往兌換紀錄查看 QR Code。');
+    showAlert('🎉 兌換成功！請前往兌換紀錄查看 QR Code。', 'success');
   };
 
   return (

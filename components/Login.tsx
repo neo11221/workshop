@@ -2,12 +2,14 @@ import React, { useState } from 'react';
 import { UserRole, UserProfile } from '../types';
 import { getStudents, registerStudent, ADMIN_USER, GUEST_USER, saveUser } from '../utils/storage';
 import { Zap, ShieldCheck, User, UserPlus, Eye } from 'lucide-react';
+import { useAlert } from './AlertProvider';
 
 interface LoginProps {
     onLogin: (user: UserProfile) => void;
 }
 
 const Login: React.FC<LoginProps> = ({ onLogin }) => {
+    const { showAlert } = useAlert();
     const [role, setRole] = useState<'student' | 'admin' | 'guest'>('student');
     const [isRegistering, setIsRegistering] = useState(false);
 
@@ -24,22 +26,22 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
         const user = students.find(s => s.name === name);
 
         if (!user) {
-            alert('找不到此用戶，請先註冊。');
+            showAlert('找不到此用戶，請先註冊。', 'error');
             return;
         }
 
         if (user.password && user.password !== password) {
-            alert('密碼錯誤。');
+            showAlert('密碼錯誤。', 'error');
             return;
         }
 
         if (!user.isApproved) {
-            alert('您的帳號尚在審核中，請待導師核准。');
+            showAlert('您的帳號尚在審核中，請待導師核准。', 'info');
             return;
         }
 
         await saveUser(user);
-        alert('登入成功！');
+        showAlert('登入成功！', 'success');
         onLogin(user);
     };
 
@@ -47,11 +49,11 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
         e.preventDefault();
         const success = await registerStudent(name, password, grade);
         if (success) {
-            alert('註冊申請已送出！請通知導師審核。');
+            showAlert('註冊申請已送出！請通知導師審核。', 'success');
             setIsRegistering(false);
             setPassword('');
         } else {
-            alert('該名稱已被使用。');
+            showAlert('該名稱已被使用。', 'error');
         }
     };
 
@@ -59,10 +61,10 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
         e.preventDefault();
         if (adminPass === '0957999') {
             saveUser(ADMIN_USER);
-            alert('管理員登入成功！');
+            showAlert('管理員登入成功！', 'success');
             onLogin(ADMIN_USER);
         } else {
-            alert('管理員密碼錯誤');
+            showAlert('管理員密碼錯誤', 'error');
         }
     };
 
@@ -70,10 +72,10 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
         e.preventDefault();
         if (guestCode.toLowerCase() === 'aaa') {
             saveUser(GUEST_USER);
-            alert('訪客登入成功！');
+            showAlert('訪客登入成功！', 'success');
             onLogin(GUEST_USER);
         } else {
-            alert('訪客代碼錯誤');
+            showAlert('訪客代碼錯誤', 'error');
         }
     };
 

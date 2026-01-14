@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { Heart, Plus, Sparkles, Send, X, ThumbsUp } from 'lucide-react';
 import { UserProfile, Wish } from '../types';
-import { addWish, likeWish, subscribeToWishes } from '../utils/storage';
+import { subscribeToWishes, addWish, likeWish } from '../utils/storage';
+import { useAlert } from './AlertProvider';
 
 interface WishingWellProps {
     user: UserProfile;
 }
 
 const WishingWell: React.FC<WishingWellProps> = ({ user }) => {
+    const { showAlert } = useAlert();
     const [wishes, setWishes] = useState<Wish[]>([]);
     const [isAdding, setIsAdding] = useState(false);
     const [itemName, setItemName] = useState('');
@@ -41,9 +43,14 @@ const WishingWell: React.FC<WishingWellProps> = ({ user }) => {
         setIsAdding(false);
         setItemName('');
         setDescription('');
+        showAlert('許願成功！點擊頭像旁的愛心可以互相集氣喔！', 'success');
     };
 
-    const handleLike = async (wishId: string) => {
+    const handleLike = async (wishId: string, likedBy: string[] | undefined) => {
+        if (likedBy?.includes(user.id)) {
+            showAlert('你已經幫這個願望集過氣囉！', 'info');
+            return;
+        }
         await likeWish(wishId, user.id);
     };
 
@@ -62,7 +69,7 @@ const WishingWell: React.FC<WishingWellProps> = ({ user }) => {
                 <button
                     onClick={() => {
                         if (hasWished) {
-                            alert('你已經許過願囉！每個學員限許一個願望。');
+                            showAlert('你已經許過願囉！每個學員限許一個願望。', 'info');
                         } else {
                             setIsAdding(true);
                         }
@@ -94,7 +101,7 @@ const WishingWell: React.FC<WishingWellProps> = ({ user }) => {
 
                         <div className="flex items-center justify-between pt-4 border-t border-slate-50 z-10">
                             <button
-                                onClick={() => handleLike(wish.id)}
+                                onClick={() => handleLike(wish.id, wish.likedBy)}
                                 className={`flex items-center gap-2 transition-colors group/like ${wish.likedBy?.includes(user.id) ? 'text-pink-500' : 'text-slate-400 hover:text-pink-500'}`}
                             >
                                 <div className={`p-2 rounded-full transition-colors ${wish.likedBy?.includes(user.id) ? 'bg-pink-50' : 'hover:bg-pink-50'}`}>

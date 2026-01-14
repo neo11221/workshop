@@ -4,7 +4,8 @@ import { Trophy, TrendingUp, Sparkles, CheckCircle, ChevronRight, Medal, Flame, 
 import { UserProfile, RankTitle, Mission, MissionSubmission } from '../types';
 import { RANKS } from '../constants';
 import { getEncouragement } from '../services/geminiService';
-import { saveUser, hasCompletedMission, addChallengeHistory, subscribeToMissions, subscribeToMissionSubmissions, submitMission } from '../utils/storage';
+import { subscribeToMissions, subscribeToMissionSubmissions, submitMission, hasCompletedMission } from '../utils/storage';
+import { useAlert } from './AlertProvider';
 
 interface DashboardProps {
   user: UserProfile;
@@ -13,6 +14,7 @@ interface DashboardProps {
 }
 
 const Dashboard: React.FC<DashboardProps> = ({ user, rank, onUserUpdate }) => {
+  const { showAlert } = useAlert();
   const [message, setMessage] = useState('正在獲取導師的建議...');
   const [missions, setMissions] = useState<Mission[]>([]);
   const [submissions, setSubmissions] = useState<MissionSubmission[]>([]);
@@ -63,15 +65,21 @@ const Dashboard: React.FC<DashboardProps> = ({ user, rank, onUserUpdate }) => {
 
     // Check if expired
     if (mission.deadline && mission.deadline < Date.now()) {
-      alert('此任務已截止，無法再提交。');
+      showAlert('此任務已截止，無法再提交。', 'error');
+      return;
+    }
+
+    // Check if already submitted today
+    const alreadySubmittedToday = submissions.some(s => s.missionId === mission.id && s.status === 'pending');
+    if (alreadySubmittedToday) {
+      showAlert('今天已經提交過這個任務囉，請等待導師審核！', 'info');
       return;
     }
 
     setCompletingId(mission.id);
 
-    setTimeout(async () => {
-      // Create a submission instead of immediate reward
-      const submission: MissionSubmission = {
+    try {
+      await submitMission({
         id: `sub_${Date.now()}`,
         userId: user.id,
         userName: user.name,
@@ -80,12 +88,14 @@ const Dashboard: React.FC<DashboardProps> = ({ user, rank, onUserUpdate }) => {
         points: mission.points,
         timestamp: Date.now(),
         status: 'pending'
-      };
-
-      await submitMission(submission);
+      });
+      showAlert('任務提交成功！請靜候導師審核。', 'success');
+    } catch (error) {
+      console.error("Error submitting mission:", error);
+      showAlert('提交失敗，請檢查網路連線。', 'error');
+    } finally {
       setCompletingId(null);
-      alert(`✅ 任務已提交！\n請等待導師審核後即可獲得點數。`);
-    }, 1000);
+    }
   };
 
   return (

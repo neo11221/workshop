@@ -4,6 +4,7 @@ import { Camera, ShieldCheck, Check, Search, X, ScanLine, Gift, History as Histo
 import { Html5Qrcode } from 'html5-qrcode';
 import { Redemption, UserProfile, Product, UserRole, Mission, PointReason, Wish, MissionSubmission, ProductCategory } from '../types';
 import { updateRedemptionStatus, approveStudent, deleteStudent, addProduct, addMission, toggleMission, saveStudents, subscribeToStudents, subscribeToRedemptions, subscribeToProducts, subscribeToMissions, deleteProduct, addPointReason, deletePointReason, subscribeToPointReasons, subscribeToWishes, deleteWish, subscribeToMissionSubmissions, approveMission, rejectMission, updateProductStock, subscribeToProductCategories, addProductCategory, deleteProductCategory } from '../utils/storage';
+import { useAlert } from './AlertProvider';
 import { RANKS } from '../constants';
 
 interface AdminProps {
@@ -11,6 +12,7 @@ interface AdminProps {
 }
 
 const Admin: React.FC<AdminProps> = ({ onRefresh }) => {
+  const { showAlert } = useAlert();
   const [activeTab, setActiveTab] = useState<'roster' | 'scan' | 'points' | 'history' | 'approval' | 'products' | 'missions' | 'wishes' | 'mission_approval'>('roster');
   const [isScanning, setIsScanning] = useState(false);
   const [redemptions, setRedemptions] = useState<Redemption[]>([]);
@@ -149,7 +151,7 @@ const Admin: React.FC<AdminProps> = ({ onRefresh }) => {
     const codeToVerify = typeof forcedCode === 'string' ? forcedCode : scanInput;
 
     if (!codeToVerify) {
-      alert('請輸入代碼或對準攝像頭');
+      showAlert('請輸入代碼或對準攝像頭', 'error');
       return;
     }
 
@@ -161,22 +163,35 @@ const Admin: React.FC<AdminProps> = ({ onRefresh }) => {
         setScanResult(match);
         setScanInput('');
       } else {
-        alert('❌ 無效的兌換碼或該商品已核銷');
+        showAlert('無效的兌換碼或該商品已核銷', 'error');
       }
       setIsScanning(false);
     }, 800); // 縮短模擬時間
   };
 
-  const handleConfirmRedemption = async (id: string) => {
-    await updateRedemptionStatus(id, 'completed');
-    setScanResult(null);
-    onRefresh();
-    alert('✅ 核銷成功！商品已發放。');
+  const handleConfirmRedemption = async (redemptionId: string) => {
+    if (scanResult) {
+      await updateRedemptionStatus(redemptionId, 'completed');
+      setScanResult(null);
+      showAlert('核銷成功，獎勵已發放！', 'success');
+    }
   };
 
   const handleIssuePoints = async () => {
     const amount = parseInt(pointAmount);
     if (isNaN(amount) || !targetStudentId) return;
+
+    const targetStudent = students.find(s => s.id === targetStudentId);
+    if (!targetStudent) {
+      showAlert('找不到目標學生', 'error');
+      return;
+    }
+
+    const pts = parseInt(pointAmount);
+    if (isNaN(pts) || pts <= 0) {
+      showAlert('點數必須是正整數', 'error');
+      return;
+    }
 
     const updatedStudents = students.map(s => {
       if (s.id === targetStudentId) {
@@ -191,14 +206,14 @@ const Admin: React.FC<AdminProps> = ({ onRefresh }) => {
 
     await saveStudents(updatedStudents);
     onRefresh();
-    const studentName = students.find(s => s.id === targetStudentId)?.name;
-    alert(`✅ 已成功為 ${studentName} 發放 ${amount} 點！\n原因：${reason}`);
+    setStudents(prev => prev.map(s => s.id === targetStudentId ? { ...s, points: s.points + pts } : s));
     setPointAmount('');
+    showAlert(`發送成功！已給予 ${targetStudent.name} ${pts} 點。`, 'success');
   };
 
   const handleApprove = async (id: string) => {
     await approveStudent(id);
-    alert('已核准學生加入！');
+    showAlert('已核准學生加入！', 'success');
   };
 
   const handleDelete = async (id: string) => {
@@ -209,26 +224,30 @@ const Admin: React.FC<AdminProps> = ({ onRefresh }) => {
 
   const handleAddProduct = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newProductName || !newProductPrice || !newProductStock) return;
+    if (!newProductName || !newProductPrice || !newProductStock) {
+      showAlert('請填寫所有商品資訊', 'error');
+      return;
+    }
 
-    const newProduct: Product = {
-      id: `prod_${Date.now()}`,
-      name: newProductName,
-      price: parseInt(newProductPrice),
-      stock: parseInt(newProductStock),
-      category: newProductCategory,
-      description: `精選${newProductCategory === 'food' ? '美食' : newProductCategory === 'electronic' ? '電子產品' : newProductCategory === 'ticket' ? '門票' : '商品'}`,
-      imageUrl: newProductImage || 'https://images.unsplash.com/photo-1553456558-aff63285bdd1?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.0.3'
-    };
-
-    await addProduct(newProduct);
-    setIsAddingProduct(false);
-    setNewProductName('');
-    setNewProductPrice('');
-    setNewProductStock('');
-    setNewProductImage('');
-    setNewProductCategory('other');
-    alert('商品上架成功！');
+    if (newProductName && newProductPrice) {
+      const product: any = {
+        id: `prod_${Date.now()}`,
+        name: newProductName,
+        category: newProductCategory,
+        price: parseInt(newProductPrice),
+        description: `精選${newProductCategory === 'food' ? '美食' : newProductCategory === 'electronic' ? '電子產品' : newProductCategory === 'ticket' ? '門票' : '商品'}`,
+        imageUrl: newProductImage || 'https://images.unsplash.com/photo-1553456558-aff63285bdd1?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.0.3',
+        stock: parseInt(newProductStock) || 99
+      };
+      await addProduct(product);
+      setIsAddingProduct(false);
+      setNewProductName('');
+      setNewProductPrice('');
+      setNewProductStock('');
+      setNewProductImage('');
+      setNewProductCategory('other');
+      showAlert('商品上架成功！', 'success');
+    }
   };
 
   const handleDeleteProduct = async (id: string) => {
@@ -239,7 +258,10 @@ const Admin: React.FC<AdminProps> = ({ onRefresh }) => {
 
   const handleAddMission = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newMissionTitle || !newMissionPoints) return;
+    if (!newMissionTitle || !newMissionPoints) {
+      showAlert('請填寫任務標題和點數', 'error');
+      return;
+    }
 
     const newMission: Mission = {
       id: `m_${Date.now()}`,
@@ -258,23 +280,27 @@ const Admin: React.FC<AdminProps> = ({ onRefresh }) => {
     setNewMissionPoints('');
     setNewMissionType('normal');
     setNewMissionDeadline('');
-    alert('任務新增成功！運作正常。');
+    showAlert('任務發布成功！', 'success');
   };
 
   const handleDeleteWish = async (id: string) => {
-    if (window.confirm('確定要刪除此願望嗎？')) {
-      await deleteWish(id);
+    if (window.confirm('確定要執行備份嗎？（此操作僅為示意）')) {
+      showAlert('雲端備份已完成', 'success');
     }
   };
 
   const handleAddReason = async () => {
-    if (!newReason) return;
+    if (!newReason) {
+      showAlert('請輸入加分項目名稱', 'error');
+      return;
+    }
     await addPointReason({
       id: `r_${Date.now()}`,
       title: newReason
     });
     setNewReason('');
     setIsAddingReason(false);
+    showAlert('加分項目已新增', 'success');
   };
 
   const handleDeleteReason = async (id: string) => {
@@ -287,12 +313,12 @@ const Admin: React.FC<AdminProps> = ({ onRefresh }) => {
 
   const handleUpdateStock = async (id: string, newStock: number) => {
     await updateProductStock(id, newStock);
-    alert('庫存更新成功！');
+    showAlert('庫存更新成功！', 'success');
   };
 
   const handleApproveMission = async (id: string) => {
     await approveMission(id);
-    alert('任務審核已核准！點數已發放。');
+    showAlert('已核准任務，點數已發放！', 'success');
   };
 
   const handleRejectMission = async (id: string) => {

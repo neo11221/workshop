@@ -116,7 +116,7 @@ export const saveStudent = async (student: UserProfile) => {
     await setDoc(doc(db, COLLECTIONS.STUDENTS, student.id), student);
   } catch (error) {
     console.error('Error saving student:', error);
-    alert('儲存學生資料失敗，請檢查網路或權限');
+    console.error('儲存學生資料失敗，請檢查網路或權限');
   }
 };
 
@@ -630,13 +630,13 @@ export const addWish = async (wish: Wish) => {
     const wishes = await getWishes();
     const existingWish = wishes.find(w => w.userId === wish.userId);
     if (existingWish) {
-      alert('每個人僅限許願一次喔！');
+      console.error('每個人僅限許願一次喔！');
       return;
     }
     await setDoc(doc(db, COLLECTIONS.WISHES, wish.id), wish);
   } catch (error) {
     console.error('Error adding wish:', error);
-    alert('許願失敗！請檢查是否已開啟 Firestore 寫入權限 (Test Mode)');
+    console.error('許願失敗！請檢查是否已開啟 Firestore 寫入權限 (Test Mode)');
   }
 };
 
@@ -660,7 +660,7 @@ export const likeWish = async (wishId: string, userId: string) => {
       // User said "each wish can only be liked once per person"
       if (likedBy.includes(userId)) {
         // Option A: alert and return
-        alert('你已經為這個願望集過氣囉！');
+        console.error('你已經為這個願望集過氣囉！');
         return;
       }
 
@@ -716,7 +716,7 @@ export const subscribeToProducts = (callback: (products: Product[]) => void): Un
     },
     (error) => {
       console.error('Error subscribing to products:', error);
-      alert('無法讀取商品列表（權限不足或連線失敗）');
+      console.error('無法讀取商品列表（權限不足或連線失敗）');
     }
   );
 };

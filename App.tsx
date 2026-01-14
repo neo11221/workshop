@@ -97,6 +97,8 @@ const Navigation = ({ user, currentRank, onSwitchUser }: { user: UserProfile, cu
 };
 
 
+import { AlertProvider } from './components/AlertProvider';
+
 const App: React.FC = () => {
   const [user, setUser] = useState<UserProfile | null>(getUser());
 
@@ -115,28 +117,30 @@ const App: React.FC = () => {
     setUser(null);
   };
 
-  if (!user) {
-    return <Login onLogin={setUser} />;
-  }
-
   return (
-    <HashRouter>
-      <div className="min-h-screen flex flex-col md:flex-row bg-[#fbfcfd]">
-        <Navigation user={user} currentRank={currentRank} onSwitchUser={handleLogout} />
+    <AlertProvider>
+      {!user ? (
+        <Login onLogin={setUser} />
+      ) : (
+        <HashRouter>
+          <div className="min-h-screen flex flex-col md:flex-row bg-[#fbfcfd]">
+            <Navigation user={user} currentRank={currentRank} onSwitchUser={handleLogout} />
 
-        <main className="flex-1 md:ml-64 p-4 md:p-8">
-          <div className="max-w-6xl mx-auto">
-            <Routes>
-              <Route path="/" element={<Dashboard user={user} rank={currentRank} onUserUpdate={refreshUser} />} />
-              <Route path="/shop" element={<Shop user={user} onUserUpdate={refreshUser} />} />
-              <Route path="/wishes" element={<WishingWell user={user} />} />
-              <Route path="/history" element={<Redemptions user={user} />} />
-              <Route path="/admin" element={<Admin onRefresh={refreshUser} />} />
-            </Routes>
+            <main className="flex-1 md:ml-64 p-4 md:p-8">
+              <div className="max-w-6xl mx-auto">
+                <Routes>
+                  <Route path="/" element={<Dashboard user={user} rank={currentRank} onUserUpdate={refreshUser} />} />
+                  <Route path="/shop" element={<Shop user={user} onUserUpdate={refreshUser} />} />
+                  <Route path="/wishes" element={<WishingWell user={user} />} />
+                  <Route path="/history" element={<Redemptions user={user} />} />
+                  <Route path="/admin" element={<Admin onRefresh={refreshUser} />} />
+                </Routes>
+              </div>
+            </main>
           </div>
-        </main>
-      </div>
-    </HashRouter>
+        </HashRouter>
+      )}
+    </AlertProvider>
   );
 };
 
