@@ -3,9 +3,9 @@ import React, { useState, useEffect } from 'react';
 import { Camera, ShieldCheck, Check, Search, X, ScanLine, Gift, History as HistoryIcon, GraduationCap, Users, UserPlus, Package, Plus, Target, Clock, Trash2, Heart, CheckCircle } from 'lucide-react';
 import { Html5Qrcode } from 'html5-qrcode';
 import { Redemption, UserProfile, Product, UserRole, Mission, PointReason, Wish, MissionSubmission, ProductCategory } from '../types';
-import { updateRedemptionStatus, approveStudent, deleteStudent, addProduct, addMission, toggleMission, saveStudents, subscribeToStudents, subscribeToRedemptions, subscribeToProducts, subscribeToMissions, deleteProduct, addPointReason, deletePointReason, subscribeToPointReasons, subscribeToWishes, deleteWish, subscribeToMissionSubmissions, approveMission, rejectMission, updateProductStock, subscribeToProductCategories, addProductCategory, deleteProductCategory } from '../utils/storage';
+import { updateRedemptionStatus, approveStudent, deleteStudent, addProduct, addMission, toggleMission, saveStudents, subscribeToStudents, subscribeToRedemptions, subscribeToProducts, subscribeToMissions, deleteProduct, addPointReason, deletePointReason, subscribeToPointReasons, subscribeToWishes, deleteWish, subscribeToMissionSubmissions, approveMission, rejectMission, updateProductStock, subscribeToProductCategories, addProductCategory, deleteProductCategory, saveStudent } from '../utils/storage';
 import { useAlert } from './AlertProvider';
-import { RANKS } from '../constants';
+import { RANKS, GRADES } from '../constants';
 
 interface AdminProps {
   onRefresh: () => void;
@@ -209,6 +209,12 @@ const Admin: React.FC<AdminProps> = ({ onRefresh }) => {
     setStudents(prev => prev.map(s => s.id === targetStudentId ? { ...s, points: s.points + pts } : s));
     setPointAmount('');
     showAlert(`發送成功！已給予 ${targetStudent.name} ${pts} 點。`, 'success');
+  };
+
+  const handleUpdateGrade = async (student: UserProfile, newGrade: string) => {
+    const updated = { ...student, grade: newGrade };
+    await saveStudent(updated);
+    showAlert(`已將 ${student.name} 的年級調整為 ${newGrade}`, 'success');
   };
 
   const handleApprove = async (id: string) => {
@@ -449,8 +455,19 @@ const Admin: React.FC<AdminProps> = ({ onRefresh }) => {
                   </div>
 
                   <h3 className="text-2xl font-black text-slate-800 mb-1">{student.name}</h3>
-                  <div className={`px-4 py-1 rounded-full text-[10px] font-black text-white uppercase tracking-widest mb-6 ${rank.color} shadow-sm`}>
+                  <div className={`px-4 py-1 rounded-full text-[10px] font-black text-white uppercase tracking-widest mb-2 ${rank.color} shadow-sm`}>
                     {rank.name}
+                  </div>
+                  <div className="mb-6">
+                    <select
+                      value={student.grade || '小五'}
+                      onChange={(e) => handleUpdateGrade(student, e.target.value)}
+                      className="text-xs font-bold text-slate-500 bg-slate-50 border border-slate-100 rounded-lg px-2 py-1 outline-none pointer-events-auto"
+                    >
+                      {GRADES.map(g => (
+                        <option key={g} value={g}>{g}</option>
+                      ))}
+                    </select>
                   </div>
 
                   <div className="w-full grid grid-cols-2 gap-4">

@@ -3,6 +3,7 @@ import { UserRole, UserProfile } from '../types';
 import { getStudents, registerStudent, ADMIN_USER, GUEST_USER, saveUser } from '../utils/storage';
 import { Zap, ShieldCheck, User, UserPlus, Eye } from 'lucide-react';
 import { useAlert } from './AlertProvider';
+import { GRADES } from '../constants';
 
 interface LoginProps {
     onLogin: (user: UserProfile) => void;
@@ -120,7 +121,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                             </button>
                             <button
                                 onClick={() => setRole('guest')}
-                                className={`flex-1 min-w-[100px] py-3 rounded-xl font-bold text-sm transition-all flex flex-col items-center gap-1 ${role === 'guest' ? 'bg-indigo-50 text-indigo-600 ring-2 ring-indigo-500 ring-offset-2' : 'bg-slate-50 text-slate-400 hover:bg-slate-100'}`}
+                                className={`flex-1 min-w-[100px] py-3 rounded-xl font-bold text-sm transition-all flex flex-col items-center gap-1 ${role === 'guest' ? 'bg-indigo-50 text-indigo-600 ring-2 ring-500 ring-offset-2' : 'bg-slate-50 text-slate-400 hover:bg-slate-100'}`}
                             >
                                 <Eye size={18} /> 訪客
                             </button>
@@ -201,12 +202,12 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                                     <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">年級</label>
                                     <select
                                         value={grade}
-                                        onChange={e => setGrade(e.target.value)}
-                                        className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-4 font-bold text-slate-700 outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 transition-all"
+                                        onChange={(e) => setGrade(e.target.value)}
+                                        className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-4 font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all appearance-none"
                                     >
-                                        <option>七年級</option>
-                                        <option>八年級</option>
-                                        <option>九年級</option>
+                                        {GRADES.map(g => (
+                                            <option key={g} value={g}>{g}</option>
+                                        ))}
                                     </select>
                                 </div>
                             </div>

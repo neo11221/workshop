@@ -72,3 +72,7 @@ export const STORAGE_KEYS = {
   REDEMPTIONS: 'workshop_redemptions',
   NOTIFICATIONS: 'workshop_notifications'
 };
+
+export const GRADES = [
+  '小五', '小六', '國一', '國二', '國三', '高一', '高二', '高三'
+];
