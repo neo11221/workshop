@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ShoppingCart, AlertCircle, Check, X, Tag, Package } from 'lucide-react';
-import { Product, UserProfile, Redemption } from '../types';
-import { saveUser, addRedemption, updateProductStock, subscribeToProducts } from '../utils/storage';
+import { Product, UserProfile, Redemption, ProductCategory } from '../types';
+import { saveUser, addRedemption, updateProductStock, subscribeToProducts, subscribeToProductCategories } from '../utils/storage';
 
 interface ShopProps {
   user: UserProfile;
@@ -12,14 +12,22 @@ const Shop: React.FC<ShopProps> = ({ user, onUserUpdate }) => {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [filter, setFilter] = useState<string>('all');
   const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<ProductCategory[]>([]);
 
   useEffect(() => {
     // Subscribe to real-time products updates
-    const unsubscribe = subscribeToProducts((updatedProducts) => {
+    const unsubProducts = subscribeToProducts((updatedProducts) => {
       setProducts(updatedProducts);
     });
 
-    return () => unsubscribe();
+    const unsubCategories = subscribeToProductCategories((updatedCats) => {
+      setCategories(updatedCats);
+    });
+
+    return () => {
+      unsubProducts();
+      unsubCategories();
+    };
   }, []);
 
   const filteredProducts = products.filter(p => filter === 'all' || p.category === filter);
@@ -66,16 +74,25 @@ const Shop: React.FC<ShopProps> = ({ user, onUserUpdate }) => {
       </header>
 
       <div className="flex flex-wrap gap-2">
-        {['all', 'food', 'electronic', 'ticket', 'other'].map(cat => (
+        <button
+          onClick={() => setFilter('all')}
+          className={`px-6 py-2.5 rounded-2xl text-sm font-bold transition-all ${filter === 'all'
+            ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-100'
+            : 'bg-white text-slate-600 border border-slate-200 hover:border-indigo-300'
+            }`}
+        >
+          全部商品
+        </button>
+        {categories.map(cat => (
           <button
-            key={cat}
-            onClick={() => setFilter(cat)}
-            className={`px-6 py-2.5 rounded-2xl text-sm font-bold transition-all ${filter === cat
+            key={cat.id}
+            onClick={() => setFilter(cat.name)}
+            className={`px-6 py-2.5 rounded-2xl text-sm font-bold transition-all ${filter === cat.name
               ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-100'
               : 'bg-white text-slate-600 border border-slate-200 hover:border-indigo-300'
               }`}
           >
-            {cat === 'all' ? '全部商品' : cat === 'food' ? '美味點心' : cat === 'electronic' ? '科技產品' : cat === 'ticket' ? '票券' : '其他'}
+            {cat.name}
           </button>
         ))}
       </div>

@@ -47,7 +47,9 @@ const Dashboard: React.FC<DashboardProps> = ({ user, rank, onUserUpdate }) => {
     });
 
     const unsubscribeSubmissions = subscribeToMissionSubmissions((allSubmissions) => {
-      setSubmissions(allSubmissions.filter(s => s.userId === user.id));
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      setSubmissions(allSubmissions.filter(s => s.userId === user.id && s.timestamp >= today.getTime()));
     });
 
     return () => {
@@ -250,14 +252,14 @@ const Dashboard: React.FC<DashboardProps> = ({ user, rank, onUserUpdate }) => {
                         (mission.deadline !== undefined && mission.deadline < Date.now())
                       }
                       className={`px-10 py-5 rounded-2xl font-black transition-all flex items-center gap-3 shadow-xl ${isCompleted
-                          ? 'bg-slate-200 text-slate-500 cursor-not-allowed shadow-none'
-                          : submissions.some(s => s.missionId === mission.id && s.status === 'pending')
-                            ? 'bg-amber-100 text-amber-600 cursor-not-allowed shadow-none'
-                            : (mission.deadline !== undefined && mission.deadline < Date.now())
-                              ? 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
-                              : (mission.type === 'normal' ? 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-100' :
-                                mission.type === 'challenge' ? 'bg-orange-600 hover:bg-orange-700 shadow-orange-100' :
-                                  'bg-rose-600 hover:bg-rose-700 shadow-rose-100')
+                        ? 'bg-slate-200 text-slate-500 cursor-not-allowed shadow-none'
+                        : submissions.some(s => s.missionId === mission.id && s.status === 'pending')
+                          ? 'bg-amber-100 text-amber-600 cursor-not-allowed shadow-none'
+                          : (mission.deadline !== undefined && mission.deadline < Date.now())
+                            ? 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
+                            : (mission.type === 'normal' ? 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-100' :
+                              mission.type === 'challenge' ? 'bg-orange-600 hover:bg-orange-700 shadow-orange-100' :
+                                'bg-rose-600 hover:bg-rose-700 shadow-rose-100')
                         } text-white text-lg active:scale-95 disabled:active:scale-100`}
                     >
                       {isCompleted

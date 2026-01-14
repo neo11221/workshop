@@ -2,8 +2,8 @@
 import React, { useState, useEffect } from 'react';
 import { Camera, ShieldCheck, Check, Search, X, ScanLine, Gift, History as HistoryIcon, GraduationCap, Users, UserPlus, Package, Plus, Target, Clock, Trash2, Heart, CheckCircle } from 'lucide-react';
 import { Html5QrcodeScanner } from 'html5-qrcode';
-import { Redemption, UserProfile, Product, UserRole, Mission, PointReason, Wish, MissionSubmission } from '../types';
-import { updateRedemptionStatus, approveStudent, deleteStudent, addProduct, addMission, toggleMission, saveStudents, subscribeToStudents, subscribeToRedemptions, subscribeToProducts, subscribeToMissions, deleteProduct, addPointReason, deletePointReason, subscribeToPointReasons, subscribeToWishes, deleteWish, subscribeToMissionSubmissions, approveMission, rejectMission, updateProductStock } from '../utils/storage';
+import { Redemption, UserProfile, Product, UserRole, Mission, PointReason, Wish, MissionSubmission, ProductCategory } from '../types';
+import { updateRedemptionStatus, approveStudent, deleteStudent, addProduct, addMission, toggleMission, saveStudents, subscribeToStudents, subscribeToRedemptions, subscribeToProducts, subscribeToMissions, deleteProduct, addPointReason, deletePointReason, subscribeToPointReasons, subscribeToWishes, deleteWish, subscribeToMissionSubmissions, approveMission, rejectMission, updateProductStock, subscribeToProductCategories, addProductCategory, deleteProductCategory } from '../utils/storage';
 import { RANKS } from '../constants';
 
 interface AdminProps {
@@ -23,6 +23,7 @@ const Admin: React.FC<AdminProps> = ({ onRefresh }) => {
   const [submissions, setSubmissions] = useState<MissionSubmission[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().substring(0, 7)); // YYYY-MM
+  const [categories, setCategories] = useState<ProductCategory[]>([]);
   const [scanInput, setScanInput] = useState('');
   const [scanResult, setScanResult] = useState<Redemption | null>(null);
   const redemptionsRef = React.useRef(redemptions);
@@ -49,9 +50,13 @@ const Admin: React.FC<AdminProps> = ({ onRefresh }) => {
   const [newProductName, setNewProductName] = useState('');
   const [newProductPrice, setNewProductPrice] = useState('');
   const [newProductStock, setNewProductStock] = useState('');
-  const [newProductCategory, setNewProductCategory] = useState<'food' | 'electronic' | 'ticket' | 'other'>('other');
+  const [newProductCategory, setNewProductCategory] = useState<string>('');
   const [newProductImage, setNewProductImage] = useState('');
   const [isAddingProduct, setIsAddingProduct] = useState(false);
+
+  // 分類管理
+  const [newCatName, setNewCatName] = useState('');
+  const [isManagingCats, setIsManagingCats] = useState(false);
 
   useEffect(() => {
     // Subscribe to all data with real-time updates
@@ -72,6 +77,12 @@ const Admin: React.FC<AdminProps> = ({ onRefresh }) => {
     const unsubReasons = subscribeToPointReasons(setPointReasons);
     const unsubWishes = subscribeToWishes(setWishes);
     const unsubSubmissions = subscribeToMissionSubmissions(setSubmissions);
+    const unsubCategories = subscribeToProductCategories((allCats) => {
+      setCategories(allCats);
+      if (allCats.length > 0 && !newProductCategory) {
+        setNewProductCategory(allCats[0].name);
+      }
+    });
 
     return () => {
       unsubStudents();
@@ -81,8 +92,9 @@ const Admin: React.FC<AdminProps> = ({ onRefresh }) => {
       unsubReasons();
       unsubWishes();
       unsubSubmissions();
+      unsubCategories();
     };
-  }, [targetStudentId]);
+  }, [targetStudentId, newProductCategory]);
 
   useEffect(() => {
     let scanner: Html5QrcodeScanner | null = null;
@@ -622,13 +634,56 @@ const Admin: React.FC<AdminProps> = ({ onRefresh }) => {
             <h2 className="text-3xl font-black text-slate-800 flex items-center gap-3">
               <Package className="text-indigo-600" /> 商品管理系統
             </h2>
-            <button
-              onClick={() => setIsAddingProduct(!isAddingProduct)}
-              className="bg-indigo-600 text-white px-5 py-3 rounded-xl font-bold flex items-center gap-2 hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100"
-            >
-              <Plus size={20} /> 上架新品
-            </button>
+            <div className="flex items-center gap-4">
+              <button
+                onClick={() => setIsManagingCats(!isManagingCats)}
+                className="bg-slate-100 text-slate-600 px-5 py-3 rounded-xl font-bold flex items-center gap-2 hover:bg-slate-200 transition-all border border-slate-200"
+              >
+                <Target size={18} /> 分類管理
+              </button>
+              <button
+                onClick={() => setIsAddingProduct(!isAddingProduct)}
+                className="bg-indigo-600 text-white px-5 py-3 rounded-xl font-bold flex items-center gap-2 hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100"
+              >
+                <Plus size={20} /> 上架新品
+              </button>
+            </div>
           </div>
+
+          {isManagingCats && (
+            <div className="bg-slate-50 p-6 rounded-2xl mb-8 border border-slate-200 animate-in fade-in">
+              <h3 className="font-black text-slate-700 mb-4">商品分類管理</h3>
+              <div className="flex gap-4 mb-6">
+                <input
+                  placeholder="輸入新分類名稱 (例如: 夏季限定)"
+                  value={newCatName}
+                  onChange={e => setNewCatName(e.target.value)}
+                  className="flex-1 p-3 rounded-xl border border-slate-200 font-bold outline-none"
+                />
+                <button
+                  onClick={() => {
+                    if (newCatName) {
+                      addProductCategory(newCatName);
+                      setNewCatName('');
+                    }
+                  }}
+                  className="bg-emerald-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-emerald-700"
+                >
+                  新增分類
+                </button>
+              </div>
+              <div className="flex flex-wrap gap-3">
+                {categories.map(cat => (
+                  <div key={cat.id} className="bg-white px-4 py-2 rounded-xl border border-slate-200 flex items-center gap-2 shadow-sm font-bold text-slate-600">
+                    {cat.name}
+                    <button onClick={() => deleteProductCategory(cat.id)} className="text-slate-300 hover:text-rose-500">
+                      <X size={14} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {isAddingProduct && (
             <form onSubmit={handleAddProduct} className="bg-slate-50 p-6 rounded-2xl mb-8 border border-slate-200 animate-in fade-in">
@@ -642,13 +697,13 @@ const Admin: React.FC<AdminProps> = ({ onRefresh }) => {
                 />
                 <select
                   value={newProductCategory}
-                  onChange={e => setNewProductCategory(e.target.value as any)}
+                  onChange={e => setNewProductCategory(e.target.value)}
                   className="p-3 rounded-xl border border-slate-200 font-bold outline-none focus:ring-2 focus:ring-indigo-500"
                 >
-                  <option value="food">美食</option>
-                  <option value="electronic">電子產品</option>
-                  <option value="ticket">門票</option>
-                  <option value="other">其他商品</option>
+                  {categories.map(cat => (
+                    <option key={cat.id} value={cat.name}>{cat.name}</option>
+                  ))}
+                  {categories.length === 0 && <option value="">請先新增分類</option>}
                 </select>
                 <input
                   placeholder="圖片連結 (可選)"
@@ -774,8 +829,8 @@ const Admin: React.FC<AdminProps> = ({ onRefresh }) => {
           <div className="bg-indigo-50 w-32 h-32 rounded-[2.5rem] flex items-center justify-center mx-auto mb-8 text-indigo-600 shadow-inner">
             <Camera size={56} />
           </div>
-          <h2 className="text-3xl font-black text-slate-800 mb-4 tracking-tight">啟動攝像頭掃描器</h2>
-          <p className="text-slate-400 mb-8 font-medium max-w-md mx-auto leading-relaxed">請將學員手機顯示的 QR Code 對準下方掃描區域。</p>
+          <h2 className="text-3xl font-black text-slate-800 mb-4 tracking-tight">QR Code 核銷中心</h2>
+          <p className="text-slate-400 mb-8 font-medium max-w-md mx-auto leading-relaxed">攝像頭已就緒。請將學員的 QR Code 對準下方區域，系統將自動辨識並進行核銷。</p>
 
           <div className="max-w-md mx-auto mb-8 overflow-hidden rounded-[2rem] border-4 border-indigo-50 shadow-inner">
             <div id="reader" className="w-full"></div>

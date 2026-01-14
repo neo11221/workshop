@@ -12,7 +12,7 @@ import {
   Unsubscribe,
 } from 'firebase/firestore';
 import { db } from './firebase';
-import { UserProfile, Redemption, UserRole, Product, Wish, Mission, ChallengeHistory, PointReason, MissionSubmission } from '../types';
+import { UserProfile, Redemption, UserRole, Product, Wish, Mission, ChallengeHistory, PointReason, MissionSubmission, ProductCategory } from '../types';
 import { STORAGE_KEYS, PRODUCTS } from '../constants';
 
 // Collections
@@ -25,6 +25,7 @@ const COLLECTIONS = {
   CHALLENGE_HISTORY: 'challengeHistory',
   POINT_REASONS: 'pointReasons',
   MISSION_SUBMISSIONS: 'missionSubmissions',
+  PRODUCT_CATEGORIES: 'productCategories',
 };
 
 const INITIAL_STUDENTS: UserProfile[] = [
@@ -238,6 +239,65 @@ export const updateRedemptionStatus = async (
   }
 };
 
+// --- Product Categories ---
+
+export const getProductCategories = async (): Promise<ProductCategory[]> => {
+  try {
+    const querySnapshot = await getDocs(collection(db, COLLECTIONS.PRODUCT_CATEGORIES));
+    if (querySnapshot.empty) {
+      await initializeProductCategories();
+      return [
+        { id: 'cat_food', name: '美味點心' },
+        { id: 'cat_elec', name: '科技產品' },
+        { id: 'cat_tkt', name: '票券' },
+        { id: 'cat_other', name: '其他' }
+      ];
+    }
+    return querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }) as ProductCategory);
+  } catch (error) {
+    console.error('Error fetching categories:', error);
+    return [];
+  }
+};
+
+const initializeProductCategories = async () => {
+  const batch = writeBatch(db);
+  const defaults = [
+    { id: 'food', name: '美味點心' },
+    { id: 'electronic', name: '科技產品' },
+    { id: 'ticket', name: '票券' },
+    { id: 'other', name: '其他' }
+  ];
+  defaults.forEach(cat => {
+    batch.set(doc(db, COLLECTIONS.PRODUCT_CATEGORIES, cat.id), cat);
+  });
+  await batch.commit();
+};
+
+export const addProductCategory = async (name: string) => {
+  try {
+    const id = `cat_${Date.now()}`;
+    await setDoc(doc(db, COLLECTIONS.PRODUCT_CATEGORIES, id), { id, name });
+  } catch (error) {
+    console.error('Error adding category:', error);
+  }
+};
+
+export const deleteProductCategory = async (id: string) => {
+  try {
+    await deleteDoc(doc(db, COLLECTIONS.PRODUCT_CATEGORIES, id));
+  } catch (error) {
+    console.error('Error deleting category:', error);
+  }
+};
+
+export const subscribeToProductCategories = (callback: (categories: ProductCategory[]) => void) => {
+  return onSnapshot(collection(db, COLLECTIONS.PRODUCT_CATEGORIES), (snapshot) => {
+    const categories = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }) as ProductCategory);
+    callback(categories);
+  });
+};
+
 // --- Mission Management ---
 
 const INITIAL_MISSIONS: Mission[] = [
@@ -350,7 +410,15 @@ export const hasCompletedMission = async (
 ): Promise<boolean> => {
   try {
     const history = await getChallengeHistory();
-    return history.some((h) => h.userId === userId && h.missionId === missionId);
+    // 判斷是否為「今日」完成
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    return history.some((h) =>
+      h.userId === userId &&
+      h.missionId === missionId &&
+      h.timestamp >= today.getTime()
+    );
   } catch (error) {
     console.error('Error checking mission completion:', error);
     return false;
@@ -361,23 +429,29 @@ export const hasCompletedMission = async (
 
 export const submitMission = async (submission: MissionSubmission) => {
   try {
-    // 額外檢查是否已提交過或已完成
+    // 額外檢查今日是否已完成
     const isCompleted = await hasCompletedMission(submission.userId, submission.missionId);
     if (isCompleted) {
-      console.warn('Mission already completed');
+      console.warn('Mission already completed today');
       return;
     }
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
 
     const querySnapshot = await getDocs(
       query(collection(db, COLLECTIONS.MISSION_SUBMISSIONS))
     );
-    const existingPending = querySnapshot.docs.find(d => {
+    const existingPendingToday = querySnapshot.docs.find(d => {
       const data = d.data();
-      return data.userId === submission.userId && data.missionId === submission.missionId && data.status === 'pending';
+      return data.userId === submission.userId &&
+        data.missionId === submission.missionId &&
+        data.status === 'pending' &&
+        data.timestamp >= today.getTime();
     });
 
-    if (existingPending) {
-      console.warn('Mission submission already pending');
+    if (existingPendingToday) {
+      console.warn('Mission submission already pending today');
       return;
     }
 

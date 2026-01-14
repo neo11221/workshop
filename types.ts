@@ -7,11 +7,16 @@ export enum UserRole {
 export interface Product {
   id: string;
   name: string;
-  category: 'food' | 'electronic' | 'ticket' | 'other';
+  category: string;
   price: number;
   description: string;
   imageUrl: string;
   stock: number;
+}
+
+export interface ProductCategory {
+  id: string;
+  name: string;
 }
 
 export interface User {
