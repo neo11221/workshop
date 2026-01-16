@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ShoppingCart, AlertCircle, Check, X, Tag, Package } from 'lucide-react';
+import { ShoppingCart, AlertCircle, Check, ChevronLeft, ChevronRight, X, Tag, Package } from 'lucide-react';
 import { Product, UserProfile, Redemption, ProductCategory, Banner } from '../types';
 import { saveUser, addRedemption, updateProductStock, subscribeToProducts, subscribeToProductCategories, subscribeToBanners } from '../utils/storage';
 import { useAlert } from './AlertProvider';
@@ -127,13 +127,13 @@ const Shop: React.FC<ShopProps> = ({ user, onUserUpdate }) => {
             onClick={() => setCurrentBannerIndex(prev => (prev - 1 + banners.length) % banners.length)}
             className="absolute left-4 top-1/2 -translate-y-1/2 bg-white/20 hover:bg-white/40 backdrop-blur p-2 rounded-full text-white opacity-0 group-hover:opacity-100 transition-opacity"
           >
-            <Check className="rotate-180" size={20} />
+            <ChevronLeft size={20} />
           </button>
           <button
             onClick={() => setCurrentBannerIndex(prev => (prev + 1) % banners.length)}
             className="absolute right-4 top-1/2 -translate-y-1/2 bg-white/20 hover:bg-white/40 backdrop-blur p-2 rounded-full text-white opacity-0 group-hover:opacity-100 transition-opacity"
           >
-            <Check size={20} />
+            <ChevronRight size={20} />
           </button>
         </div>
       )}

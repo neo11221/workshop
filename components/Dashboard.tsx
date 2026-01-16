@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
-import { Trophy, TrendingUp, Sparkles, CheckCircle, ChevronRight, Medal, Flame, Star, Target, Clock, Info, X } from 'lucide-react';
+import { Trophy, TrendingUp, Sparkles, CheckCircle, ChevronLeft, ChevronRight, Medal, Flame, Star, Target, Clock, Info, X } from 'lucide-react';
 import { UserProfile, RankTitle, Mission, MissionSubmission } from '../types';
 import { RANKS } from '../constants';
 import { getEncouragement } from '../services/geminiService';
@@ -215,7 +215,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, rank, onUserUpdate }) => {
             onClick={() => setCurrentBannerIndex(prev => (prev - 1 + banners.length) % banners.length)}
             className="absolute left-6 top-1/2 -translate-y-1/2 bg-white/20 hover:bg-white/40 backdrop-blur p-4 rounded-full text-white opacity-0 group-hover:opacity-100 transition-all border border-white/10"
           >
-            <ChevronRight className="rotate-180" size={24} />
+            <ChevronLeft size={24} />
           </button>
           <button
             onClick={() => setCurrentBannerIndex(prev => (prev + 1) % banners.length)}
