@@ -627,17 +627,18 @@ export const getWishes = async (): Promise<Wish[]> => {
 
 export const addWish = async (wish: Wish) => {
   try {
-    // Check if user already has a wish
-    const wishes = await getWishes();
-    const existingWish = wishes.find(w => w.userId === wish.userId);
-    if (existingWish) {
-      console.error('每個人僅限許願一次喔！');
-      return;
-    }
     await setDoc(doc(db, COLLECTIONS.WISHES, wish.id), wish);
   } catch (error) {
     console.error('Error adding wish:', error);
-    console.error('許願失敗！請檢查是否已開啟 Firestore 寫入權限 (Test Mode)');
+  }
+};
+
+export const updateWish = async (wishId: string, updates: Partial<Wish>) => {
+  try {
+    const docRef = doc(db, COLLECTIONS.WISHES, wishId);
+    await updateDoc(docRef, updates);
+  } catch (error) {
+    console.error('Error updating wish:', error);
   }
 };
 

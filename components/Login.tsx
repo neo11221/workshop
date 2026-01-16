@@ -89,10 +89,10 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                     <div className="absolute bottom-0 left-0 w-48 h-48 bg-indigo-700 rounded-full translate-y-1/3 -translate-x-1/3 opacity-50"></div>
 
                     <div className="relative z-10">
-                        <div className="bg-white/20 w-16 h-16 rounded-2xl flex items-center justify-center backdrop-blur-sm mb-6">
-                            <Zap size={32} />
+                        <div className="bg-white w-16 h-16 rounded-2xl flex items-center justify-center p-2 mb-6 shadow-xl">
+                            <img src="/wenhong_logo.jpg" className="w-full h-full rounded-xl object-cover" alt="logo" />
                         </div>
-                        <h1 className="text-4xl font-black tracking-tight mb-4">學習工坊</h1>
+                        <h1 className="text-4xl font-black tracking-tight mb-4">文宏學習工坊</h1>
                         <p className="text-indigo-100 font-medium text-lg leading-relaxed">紀錄你的每一個成長軌跡，兌換屬於你的榮耀。</p>
                     </div>
 

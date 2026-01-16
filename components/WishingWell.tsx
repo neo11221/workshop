@@ -1,18 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import { Heart, Plus, Sparkles, Send, X, ThumbsUp } from 'lucide-react';
 import { UserProfile, Wish } from '../types';
-import { subscribeToWishes, addWish, likeWish } from '../utils/storage';
+import { subscribeToWishes, addWish, likeWish, updateWish, saveStudent } from '../utils/storage';
 import { useAlert } from './AlertProvider';
-import { Clock } from 'lucide-react';
+import { Clock, Coins } from 'lucide-react';
 
 const COOLDOWN_DAYS = 30;
 const COOLDOWN_MS = COOLDOWN_DAYS * 24 * 60 * 60 * 1000;
 
 interface WishingWellProps {
     user: UserProfile;
+    onUserUpdate: () => void;
 }
 
-const WishingWell: React.FC<WishingWellProps> = ({ user }) => {
+const WishingWell: React.FC<WishingWellProps> = ({ user, onUserUpdate }) => {
     const { showAlert } = useAlert();
     const [wishes, setWishes] = useState<Wish[]>([]);
     const [isAdding, setIsAdding] = useState(false);
@@ -86,6 +87,33 @@ const WishingWell: React.FC<WishingWellProps> = ({ user }) => {
         await likeWish(wishId, user.id);
     };
 
+    const handleResetCooldown = async () => {
+        if (user.points < 1000) {
+            showAlert('點數不足！需要 1000 點才能重置冷卻喔。', 'error');
+            return;
+        }
+
+        if (confirm('確定要花費 1000 點重置冷卻時間嗎？')) {
+            try {
+                // 1. Deduct points
+                const updatedUser = { ...user, points: user.points - 1000 };
+                await saveStudent(updatedUser);
+
+                // 2. Reset last wish timestamp (set to 31 days ago)
+                if (userLastWish) {
+                    await updateWish(userLastWish.id, {
+                        timestamp: Date.now() - (COOLDOWN_MS + 100000)
+                    });
+                }
+
+                showAlert('冷卻已重置！可以再次許願了。', 'success');
+                onUserUpdate();
+            } catch (error) {
+                showAlert('重置失敗，請稍後再試。', 'error');
+            }
+        }
+    };
+
 
 
     return (
@@ -113,9 +141,21 @@ const WishingWell: React.FC<WishingWellProps> = ({ user }) => {
                         <span>{isOnCooldown ? '冷卻中' : '我要許願'}</span>
                     </div>
                     {isOnCooldown && timeLeft && (
-                        <span className="text-[10px] font-bold font-mono tracking-tight">
-                            {timeLeft.d}天 {timeLeft.h}時 {timeLeft.m}分 {timeLeft.s}秒
-                        </span>
+                        <div className="flex flex-col items-center">
+                            <span className="text-[10px] font-bold font-mono tracking-tight">
+                                {timeLeft.d}天 {timeLeft.h}時 {timeLeft.m}分 {timeLeft.s}秒
+                            </span>
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleResetCooldown();
+                                }}
+                                className="mt-2 bg-amber-100 text-amber-700 px-3 py-1 rounded-full text-[10px] font-black flex items-center gap-1 hover:bg-amber-200 transition-colors shadow-sm"
+                            >
+                                <Coins size={10} />
+                                1000 PTS 重置
+                            </button>
+                        </div>
                     )}
                 </button>
             </header>

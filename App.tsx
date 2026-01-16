@@ -45,10 +45,8 @@ const Navigation = ({ user, currentRank, onSwitchUser }: { user: UserProfile, cu
     <nav className="bg-white border-r border-slate-200 w-full md:w-64 md:fixed md:inset-y-0 h-auto md:h-full z-50 shadow-sm">
       <div className="p-6 border-b border-slate-100 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <div className="bg-indigo-600 p-2 rounded-lg text-white">
-            <Zap size={20} />
-          </div>
-          <span className="text-xl font-bold text-slate-800 tracking-tight">學習工坊</span>
+          <img src="/wenhong_logo.jpg" className="w-8 h-8 rounded-lg shadow-sm object-cover" alt="logo" />
+          <span className="text-xl font-bold text-slate-800 tracking-tight">文宏學習工坊</span>
         </div>
         <button onClick={() => setIsOpen(!isOpen)} className="md:hidden text-slate-600">
           {isOpen ? <X /> : <Menu />}
@@ -140,7 +138,7 @@ const App: React.FC = () => {
                 <Routes>
                   <Route path="/" element={<Dashboard user={user} rank={currentRank} onUserUpdate={refreshUser} />} />
                   <Route path="/shop" element={<Shop user={user} onUserUpdate={refreshUser} />} />
-                  <Route path="/wishes" element={<WishingWell user={user} />} />
+                  <Route path="/wishes" element={<WishingWell user={user} onUserUpdate={refreshUser} />} />
                   <Route path="/history" element={<Redemptions user={user} />} />
                   <Route path="/admin" element={<Admin onRefresh={refreshUser} />} />
                   <Route path="/settings" element={<Settings user={user} onUserUpdate={refreshUser} />} />

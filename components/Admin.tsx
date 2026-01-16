@@ -26,6 +26,7 @@ const Admin: React.FC<AdminProps> = ({ onRefresh }) => {
   const [submissions, setSubmissions] = useState<MissionSubmission[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().substring(0, 7)); // YYYY-MM
+  const [gradeFilter, setGradeFilter] = useState('全部');
   const [categories, setCategories] = useState<ProductCategory[]>([]);
   const [banners, setBanners] = useState<Banner[]>([]);
   const [scanInput, setScanInput] = useState('');
@@ -273,6 +274,15 @@ const Admin: React.FC<AdminProps> = ({ onRefresh }) => {
     const updated = { ...student, grade: newGrade };
     await saveStudent(updated);
     showAlert(`已將 ${student.name} 的年級調整為 ${newGrade}`, 'success');
+  };
+
+  const handleDirectUpdatePoints = async (student: UserProfile, field: 'points' | 'totalEarned', value: string) => {
+    const numValue = parseInt(value);
+    if (isNaN(numValue)) return;
+    const updated = { ...student, [field]: numValue };
+    await saveStudent(updated);
+    // No alert here to avoid spamming while typing, or maybe add a small "Save" button?
+    // Let's rely on the real-time update.
   };
 
   const handleApprove = async (id: string) => {
@@ -539,11 +549,21 @@ const Admin: React.FC<AdminProps> = ({ onRefresh }) => {
                   <div className="w-full grid grid-cols-2 gap-4">
                     <div className="bg-indigo-50/50 p-4 rounded-2xl border border-indigo-50">
                       <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-1">可用點數</p>
-                      <p className="text-xl font-black text-indigo-600">{student.points.toLocaleString()}</p>
+                      <input
+                        type="number"
+                        defaultValue={student.points}
+                        onBlur={(e) => handleDirectUpdatePoints(student, 'points', e.target.value)}
+                        className="w-full bg-transparent text-xl font-black text-indigo-600 focus:outline-none"
+                      />
                     </div>
                     <div className="bg-amber-50/50 p-4 rounded-2xl border border-amber-50">
                       <p className="text-[10px] font-black text-amber-400 uppercase tracking-widest mb-1">總累積</p>
-                      <p className="text-xl font-black text-amber-600">{student.totalEarned.toLocaleString()}</p>
+                      <input
+                        type="number"
+                        defaultValue={student.totalEarned}
+                        onBlur={(e) => handleDirectUpdatePoints(student, 'totalEarned', e.target.value)}
+                        className="w-full bg-transparent text-xl font-black text-amber-600 focus:outline-none"
+                      />
                     </div>
                   </div>
                 </div>
@@ -588,10 +608,26 @@ const Admin: React.FC<AdminProps> = ({ onRefresh }) => {
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-16">
             <div className="space-y-8">
-              <div>
-                <label className="block text-xs font-black text-slate-400 uppercase tracking-[0.2em] mb-4">第一步：選擇受獎學員</label>
-                <div className="grid grid-cols-3 gap-4">
-                  {students.map(s => (
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-xs font-black text-slate-400 uppercase tracking-[0.2em]">第一步：選擇受獎學員</label>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-bold text-slate-400">年級篩選:</span>
+                  <select
+                    value={gradeFilter}
+                    onChange={(e) => setGradeFilter(e.target.value)}
+                    className="text-[10px] font-bold text-slate-600 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 outline-none"
+                  >
+                    <option value="全部">全部</option>
+                    {GRADES.map(g => (
+                      <option key={g} value={g}>{g}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-4 max-h-[400px] overflow-y-auto p-2">
+                {students
+                  .filter(s => gradeFilter === '全部' || s.grade === gradeFilter)
+                  .map(s => (
                     <button
                       key={s.id}
                       onClick={() => setTargetStudentId(s.id)}
@@ -601,754 +637,770 @@ const Admin: React.FC<AdminProps> = ({ onRefresh }) => {
                       <span className={`font-black text-sm ${targetStudentId === s.id ? 'text-indigo-600' : 'text-slate-600'}`}>{s.name}</span>
                     </button>
                   ))}
-                </div>
-              </div>
-
-              <div>
-                <div className="flex items-center justify-between mb-4">
-                  <label className="block text-xs font-black text-slate-400 uppercase tracking-[0.2em]">第二步：發放名目</label>
-                  <button
-                    onClick={() => setIsAddingReason(!isAddingReason)}
-                    className="text-xs font-black text-indigo-600 hover:text-indigo-700 flex items-center gap-1"
-                  >
-                    {isAddingReason ? <X size={14} /> : <Plus size={14} />}
-                    {isAddingReason ? '取消新增' : '管理名目'}
-                  </button>
-                </div>
-
-                {isAddingReason ? (
-                  <div className="bg-slate-50 p-6 rounded-2xl border-2 border-indigo-100 mb-4 animate-in zoom-in-95 duration-200">
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        placeholder="輸入新名目 (例: 認真打掃)"
-                        value={newReason}
-                        onChange={e => setNewReason(e.target.value)}
-                        className="flex-1 p-3 border-2 border-slate-200 rounded-xl focus:border-indigo-600 outline-none font-bold"
-                      />
-                      <button
-                        onClick={handleAddReason}
-                        className="bg-indigo-600 text-white p-3 rounded-xl hover:bg-indigo-700 shadow-md"
-                      >
-                        <Plus size={20} />
-                      </button>
-                    </div>
-                    <div className="mt-4 space-y-2 max-h-40 overflow-y-auto pr-2">
-                      {pointReasons.map(r => (
-                        <div key={r.id} className="flex items-center justify-between bg-white p-3 rounded-lg border border-slate-100">
-                          <span className="font-bold text-sm text-slate-700">{r.title}</span>
-                          <button onClick={() => handleDeleteReason(r.id)} className="text-rose-500 hover:text-rose-600">
-                            <Trash2 size={16} />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ) : (
-                  <select
-                    value={reason}
-                    onChange={e => setReason(e.target.value)}
-                    className="w-full p-5 bg-slate-50 border-2 border-transparent rounded-2xl focus:bg-white focus:border-indigo-600 focus:ring-4 focus:ring-indigo-100 transition-all outline-none font-bold text-slate-700 shadow-inner"
-                  >
-                    <option value="">請選擇發放名目...</option>
-                    {pointReasons.length > 0 ? (
-                      pointReasons.map(r => (
-                        <option key={r.id} value={r.title}>{r.title}</option>
-                      ))
-                    ) : (
-                      <>
-                        <option>期中考試成績優異</option>
-                        <option>課堂專題報告表現亮眼</option>
-                        <option>作業提前完成並獲得 A++</option>
-                        <option>熱心助人、品格優秀</option>
-                      </>
-                    )}
-                    <option value="other">其他自定義原因</option>
-                  </select>
-                )}
-                {reason === 'other' && !isAddingReason && (
-                  <input
-                    type="text"
-                    placeholder="請輸入發放原因..."
-                    value={reason === 'other' ? '' : reason}
-                    onChange={e => setReason(e.target.value)}
-                    className="w-full mt-4 p-5 bg-white border-2 border-indigo-200 rounded-2xl outline-none font-bold text-slate-700"
-                  />
-                )}
               </div>
             </div>
 
-            <div className="space-y-8">
-              <div>
-                <label className="block text-xs font-black text-slate-400 uppercase tracking-[0.2em] mb-4">第三步：調整點數金額</label>
-                <div className="relative">
-                  <input
-                    type="number"
-                    value={pointAmount}
-                    onChange={e => setPointAmount(e.target.value)}
-                    className="w-full p-8 text-5xl font-black bg-slate-50 border-2 border-transparent rounded-[2rem] focus:bg-white focus:border-indigo-600 focus:ring-4 focus:ring-indigo-100 transition-all outline-none text-indigo-600 shadow-inner"
-                  />
-                  <div className="absolute right-8 top-1/2 -translate-y-1/2 flex items-center gap-2 pointer-events-none">
-                    <span className="font-black text-slate-300 text-2xl uppercase tracking-tighter">PTS</span>
-                  </div>
-                </div>
-              </div>
-
-              <button
-                onClick={handleIssuePoints}
-                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black py-8 rounded-[2rem] transition-all shadow-2xl shadow-emerald-200 flex items-center justify-center gap-4 text-2xl active:scale-95 group"
-              >
-                <Check size={32} className="group-hover:scale-125 transition-transform" />
-                確認核發獎勵
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {activeTab === 'approval' && (
-        <div className="bg-white rounded-[3rem] p-12 border border-slate-100 shadow-xl animate-in slide-in-from-bottom-4">
-          <h2 className="text-3xl font-black text-slate-800 mb-8 flex items-center gap-3">
-            <UserPlus className="text-indigo-600" />
-            註冊審核
-            <span className="bg-indigo-100 text-indigo-600 text-sm px-3 py-1 rounded-full">{pendingStudents.length} 待處裡</span>
-          </h2>
-
-          <div className="space-y-4">
-            {pendingStudents.length === 0 ? (
-              <div className="text-center py-20 text-slate-400 font-bold">目前沒有待審核的註冊申請</div>
-            ) : (
-              pendingStudents.map(student => (
-                <div key={student.id} className="flex items-center justify-between p-6 bg-slate-50 rounded-2xl border border-slate-100">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-indigo-200 rounded-full flex items-center justify-center text-indigo-700 font-bold text-xl">
-                      {student.name[0]}
-                    </div>
-                    <div>
-                      <h3 className="font-black text-lg text-slate-800">{student.name}</h3>
-                      <p className="text-slate-500 text-sm font-bold">{student.grade || '未填寫年級'}</p>
-                    </div>
-                  </div>
-                  <div className="flex gap-3">
-                    <button
-                      onClick={() => handleApprove(student.id)}
-                      className="bg-emerald-500 hover:bg-emerald-600 text-white px-6 py-2 rounded-xl font-bold transition-all shadow-lg shadow-emerald-100"
-                    >
-                      核准
-                    </button>
-                    <button
-                      onClick={() => handleDelete(student.id)}
-                      className="bg-slate-200 hover:bg-rose-500 hover:text-white text-slate-500 px-6 py-2 rounded-xl font-bold transition-all"
-                    >
-                      拒絕
-                    </button>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-      )}
-
-      {activeTab === 'products' && (
-        <div className="bg-white rounded-[3rem] p-12 border border-slate-100 shadow-xl animate-in slide-in-from-bottom-4">
-          <div className="flex justify-between items-center mb-8">
-            <h2 className="text-3xl font-black text-slate-800 flex items-center gap-3">
-              <Package className="text-indigo-600" /> 商品管理系統
-            </h2>
-            <div className="flex items-center gap-4">
-              <button
-                onClick={() => setIsManagingCats(!isManagingCats)}
-                className="bg-slate-100 text-slate-600 px-5 py-3 rounded-xl font-bold flex items-center gap-2 hover:bg-slate-200 transition-all border border-slate-200"
-              >
-                <Target size={18} /> 分類管理
-              </button>
-              <button
-                onClick={() => setIsAddingProduct(!isAddingProduct)}
-                className="bg-indigo-600 text-white px-5 py-3 rounded-xl font-bold flex items-center gap-2 hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100"
-              >
-                <Plus size={20} /> 上架新品
-              </button>
-            </div>
-          </div>
-
-          {isManagingCats && (
-            <div className="bg-slate-50 p-6 rounded-2xl mb-8 border border-slate-200 animate-in fade-in">
-              <h3 className="font-black text-slate-700 mb-4">商品分類管理</h3>
-              <div className="flex gap-4 mb-6">
-                <input
-                  placeholder="輸入新分類名稱 (例如: 夏季限定)"
-                  value={newCatName}
-                  onChange={e => setNewCatName(e.target.value)}
-                  className="flex-1 p-3 rounded-xl border border-slate-200 font-bold outline-none"
-                />
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <label className="block text-xs font-black text-slate-400 uppercase tracking-[0.2em]">第二步：發放名目</label>
                 <button
-                  onClick={() => {
-                    if (newCatName) {
-                      addProductCategory(newCatName);
-                      setNewCatName('');
-                    }
-                  }}
-                  className="bg-emerald-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-emerald-700"
+                  onClick={() => setIsAddingReason(!isAddingReason)}
+                  className="text-xs font-black text-indigo-600 hover:text-indigo-700 flex items-center gap-1"
                 >
-                  新增分類
+                  {isAddingReason ? <X size={14} /> : <Plus size={14} />}
+                  {isAddingReason ? '取消新增' : '管理名目'}
                 </button>
               </div>
-              <div className="flex flex-wrap gap-3">
-                {categories.map(cat => (
-                  <div key={cat.id} className="bg-white px-4 py-2 rounded-xl border border-slate-200 flex items-center gap-2 shadow-sm font-bold text-slate-600">
-                    {cat.name}
-                    <button onClick={() => deleteProductCategory(cat.id)} className="text-slate-300 hover:text-rose-500">
-                      <X size={14} />
+
+              {isAddingReason ? (
+                <div className="bg-slate-50 p-6 rounded-2xl border-2 border-indigo-100 mb-4 animate-in zoom-in-95 duration-200">
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      placeholder="輸入新名目 (例: 認真打掃)"
+                      value={newReason}
+                      onChange={e => setNewReason(e.target.value)}
+                      className="flex-1 p-3 border-2 border-slate-200 rounded-xl focus:border-indigo-600 outline-none font-bold"
+                    />
+                    <button
+                      onClick={handleAddReason}
+                      className="bg-indigo-600 text-white p-3 rounded-xl hover:bg-indigo-700 shadow-md"
+                    >
+                      <Plus size={20} />
                     </button>
                   </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {isAddingProduct && (
-            <form onSubmit={handleAddProduct} className="bg-slate-50 p-6 rounded-2xl mb-8 border border-slate-200 animate-in fade-in">
-              <h3 className="font-black text-slate-700 mb-4">輸入新商品資訊</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                <input
-                  placeholder="商品名稱"
-                  value={newProductName}
-                  onChange={e => setNewProductName(e.target.value)}
-                  className="p-3 rounded-xl border border-slate-200 font-bold outline-none focus:ring-2 focus:ring-indigo-500"
-                />
+                  <div className="mt-4 space-y-2 max-h-40 overflow-y-auto pr-2">
+                    {pointReasons.map(r => (
+                      <div key={r.id} className="flex items-center justify-between bg-white p-3 rounded-lg border border-slate-100">
+                        <span className="font-bold text-sm text-slate-700">{r.title}</span>
+                        <button onClick={() => handleDeleteReason(r.id)} className="text-rose-500 hover:text-rose-600">
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
                 <select
-                  value={newProductCategory}
-                  onChange={e => setNewProductCategory(e.target.value)}
-                  className="p-3 rounded-xl border border-slate-200 font-bold outline-none focus:ring-2 focus:ring-indigo-500"
+                  value={reason}
+                  onChange={e => setReason(e.target.value)}
+                  className="w-full p-5 bg-slate-50 border-2 border-transparent rounded-2xl focus:bg-white focus:border-indigo-600 focus:ring-4 focus:ring-indigo-100 transition-all outline-none font-bold text-slate-700 shadow-inner"
                 >
-                  {categories.map(cat => (
-                    <option key={cat.id} value={cat.name}>{cat.name}</option>
-                  ))}
-                  {categories.length === 0 && <option value="">請先新增分類</option>}
+                  <option value="">請選擇發放名目...</option>
+                  {pointReasons.length > 0 ? (
+                    pointReasons.map(r => (
+                      <option key={r.id} value={r.title}>{r.title}</option>
+                    ))
+                  ) : (
+                    <>
+                      <option>期中考試成績優異</option>
+                      <option>課堂專題報告表現亮眼</option>
+                      <option>作業提前完成並獲得 A++</option>
+                      <option>熱心助人、品格優秀</option>
+                    </>
+                  )}
+                  <option value="other">其他自定義原因</option>
                 </select>
-                <div className="flex flex-col gap-2">
-                  <label className="flex items-center justify-center gap-2 p-3 rounded-xl border-2 border-dashed border-slate-300 hover:border-indigo-400 hover:bg-indigo-50 transition-all cursor-pointer font-bold text-slate-500 hover:text-indigo-600">
-                    <Upload size={18} />
-                    {newProductImage ? '已選擇圖片' : '上傳商品圖片 (200KB內)'}
-                    <input type="file" className="hidden" accept="image/*" onChange={handleProductImageSelect} />
-                  </label>
-                  {imagePreview && <img src={imagePreview} className="h-20 w-auto object-cover rounded-lg border border-slate-200" alt="preview" />}
-                </div>
-                <input
-                  placeholder="價格 (點數)"
-                  type="number"
-                  value={newProductPrice}
-                  onChange={e => setNewProductPrice(e.target.value)}
-                  className="p-3 rounded-xl border border-slate-200 font-bold outline-none focus:ring-2 focus:ring-indigo-500"
-                />
-                <textarea
-                  placeholder="商品介紹 (可選)"
-                  value={newProductDescription}
-                  onChange={e => setNewProductDescription(e.target.value)}
-                  className="p-3 rounded-xl border border-slate-200 font-bold outline-none focus:ring-2 focus:ring-indigo-500 md:col-span-2 h-24"
-                />
-                <input
-                  placeholder="庫存數量"
-                  type="number"
-                  value={newProductStock}
-                  onChange={e => setNewProductStock(e.target.value)}
-                  className="p-3 rounded-xl border border-slate-200 font-bold outline-none focus:ring-2 focus:ring-indigo-500"
-                />
-              </div>
-              <div className="flex justify-end gap-2">
-                <button type="button" onClick={() => setIsAddingProduct(false)} className="px-4 py-2 text-slate-400 font-bold hover:text-slate-600">取消</button>
-                <button type="submit" className="px-6 py-2 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700">確認上架</button>
-              </div>
-            </form>
-          )}
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {products.map((product) => (
-              <div key={product.id} className="border border-slate-100 rounded-[2rem] p-6 flex flex-col gap-4 group hover:shadow-xl transition-all bg-white relative">
-                <div className="flex gap-4 items-center">
-                  <img src={product.imageUrl} alt={product.name} className="w-20 h-20 rounded-2xl object-cover shadow-sm" />
-                  <div className="flex-1">
-                    <h4 className="font-black text-slate-800 text-lg">{product.name}</h4>
-                    <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">{product.category}</p>
-                    <p className="text-indigo-600 font-black">{product.price} PTS</p>
-                  </div>
-                  <button
-                    onClick={() => handleDeleteProduct(product.id)}
-                    className="p-2 text-slate-300 hover:text-rose-500 transition-colors"
-                  >
-                    <Trash2 size={18} />
-                  </button>
-                </div>
-
-                <div className="flex items-center justify-between pt-4 border-t border-slate-50">
-                  <div className="flex flex-col">
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-tighter mb-1">庫存管理</span>
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="number"
-                        defaultValue={product.stock}
-                        onBlur={(e) => handleUpdateStock(product.id, parseInt(e.target.value) || 0)}
-                        className="w-16 p-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-black text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500"
-                      />
-                      <span className={`text-[10px] font-black px-2 py-1 rounded-lg ${product.stock > 0 ? 'bg-emerald-100 text-emerald-600' : 'bg-red-100 text-red-600'}`}>
-                        {product.stock > 0 ? 'ON SALE' : 'SOLD OUT'}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {activeTab === 'mission_approval' && (
-        <div className="bg-white rounded-[3rem] p-12 border border-slate-100 shadow-xl animate-in slide-in-from-bottom-4">
-          <h2 className="text-3xl font-black text-slate-800 mb-8 flex items-center gap-3">
-            <CheckCircle className="text-emerald-600" />
-            任務提交審核
-            <span className="bg-emerald-100 text-emerald-600 text-sm px-3 py-1 rounded-full">{submissions.filter(s => s.status === 'pending').length} 待處裡</span>
-          </h2>
-
-          <div className="space-y-6">
-            {submissions.filter(s => s.status === 'pending').length === 0 ? (
-              <div className="text-center py-24 text-slate-400 font-bold bg-slate-50 rounded-[3rem] border border-slate-100 border-dashed">
-                目前沒有待審核的任務提交
-              </div>
-            ) : (
-              submissions.filter(s => s.status === 'pending').map(sub => (
-                <div key={sub.id} className="bg-slate-50 p-8 rounded-[2.5rem] border border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-6">
-                  <div className="flex items-center gap-6">
-                    <div className="w-16 h-16 bg-white rounded-2xl shadow-sm flex items-center justify-center text-2xl font-black text-indigo-600 border border-slate-100">
-                      {sub.userName[0]}
-                    </div>
-                    <div>
-                      <h3 className="text-xl font-black text-slate-800">{sub.userName}</h3>
-                      <p className="text-slate-500 font-bold flex items-center gap-2">
-                        提交了任務：<span className="text-indigo-600">「{sub.missionTitle}」</span>
-                      </p>
-                      <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mt-2">
-                        獎勵點數：{sub.points} PTS • 提交時間：{new Date(sub.timestamp).toLocaleString()}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex gap-4">
-                    <button
-                      onClick={() => handleApproveMission(sub.id)}
-                      className="bg-emerald-600 hover:bg-emerald-700 text-white px-8 py-3 rounded-2xl font-black transition-all shadow-xl shadow-emerald-100 flex items-center gap-2"
-                    >
-                      <Check size={20} /> 核准發放
-                    </button>
-                    <button
-                      onClick={() => handleRejectMission(sub.id)}
-                      className="bg-white hover:bg-rose-50 text-slate-400 hover:text-rose-600 px-8 py-3 rounded-2xl font-black transition-all border border-slate-200"
-                    >
-                      不予核准
-                    </button>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-      )}
-
-      {activeTab === 'scan' && (
-        <div className="bg-white rounded-[3rem] p-16 border border-slate-100 text-center shadow-xl animate-in fade-in">
-          <div className="bg-indigo-50 w-32 h-32 rounded-[2.5rem] flex items-center justify-center mx-auto mb-8 text-indigo-600 shadow-inner">
-            <Camera size={56} />
-          </div>
-          <h2 className="text-3xl font-black text-slate-800 mb-4 tracking-tight">QR Code 核銷中心</h2>
-          <p className="text-slate-400 mb-8 font-medium max-w-md mx-auto leading-relaxed">攝像頭已就緒。請將學員的 QR Code 對準下方區域，系統將自動辨識並進行核銷。</p>
-
-          <div className="max-w-md mx-auto mb-8 overflow-hidden rounded-[2rem] border-4 border-indigo-50 shadow-inner">
-            <div id="reader" className="w-full"></div>
-          </div>
-
-          <div className="max-w-md mx-auto mb-8">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="h-px bg-slate-200 flex-1"></div>
-              <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest">或手動輸入對應字串</span>
-              <div className="h-px bg-slate-200 flex-1"></div>
-            </div>
-            <input
-              type="text"
-              placeholder="貼上 QR Code 代碼..."
-              value={scanInput}
-              onChange={(e) => setScanInput(e.target.value)}
-              className="w-full p-4 bg-slate-50 border-2 border-indigo-50 rounded-2xl focus:bg-white focus:border-indigo-600 outline-none font-mono text-xs text-slate-500 text-center"
-            />
-          </div>
-
-          <button
-            onClick={() => handleStartScan()}
-            disabled={isScanning}
-            className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 text-white px-16 py-6 rounded-[2rem] font-black transition-all shadow-2xl shadow-indigo-200 inline-flex items-center justify-center gap-4 text-xl active:scale-95"
-          >
-            {isScanning ? '正在比對資料庫...' : '確認代碼並核銷'}
-          </button>
-        </div>
-      )}
-
-      {activeTab === 'history' && (
-        <section className="bg-white rounded-[3rem] border border-slate-100 shadow-xl overflow-hidden animate-in fade-in">
-          <div className="p-10 border-b border-slate-50 flex flex-col md:flex-row md:items-center justify-between gap-6">
-            <h2 className="font-black text-2xl text-slate-800 flex items-center gap-3">
-              <HistoryIcon className="text-indigo-600" />
-              全體兌換日誌
-            </h2>
-            <div className="flex flex-col md:flex-row gap-4 items-center">
-              <div className="relative">
-                <input
-                  type="month"
-                  value={selectedMonth}
-                  onChange={(e) => setSelectedMonth(e.target.value)}
-                  className="pl-5 pr-5 py-4 rounded-2xl bg-slate-50 border-2 border-transparent focus:bg-white focus:border-indigo-600 focus:ring-4 focus:ring-indigo-100 transition-all outline-none text-sm font-bold shadow-inner"
-                />
-              </div>
-              <div className="relative">
-                <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
+              )}
+              {reason === 'other' && !isAddingReason && (
                 <input
                   type="text"
-                  placeholder="搜尋學生、商品或流水號..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-14 pr-8 py-4 rounded-2xl bg-slate-50 border-2 border-transparent focus:bg-white focus:border-indigo-600 focus:ring-4 focus:ring-indigo-100 transition-all outline-none text-sm w-full md:w-80 shadow-inner font-bold"
+                  placeholder="請輸入發放原因..."
+                  value={reason === 'other' ? '' : reason}
+                  onChange={e => setReason(e.target.value)}
+                  className="w-full mt-4 p-5 bg-white border-2 border-indigo-200 rounded-2xl outline-none font-bold text-slate-700"
                 />
-              </div>
+              )}
             </div>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-slate-50/50">
-                <tr>
-                  <th className="px-10 py-6 text-left text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">狀態</th>
-                  <th className="px-10 py-6 text-left text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">學員</th>
-                  <th className="px-10 py-6 text-left text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">兌換商品</th>
-                  <th className="px-10 py-6 text-left text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">扣點</th>
-                  <th className="px-10 py-6 text-left text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">日期</th>
-                  <th className="px-10 py-6 text-left text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">操作</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-50">
-                {filteredRedemptions.map(r => {
-                  try {
-                    return (
-                      <tr key={r.id} className="hover:bg-slate-50/50 transition-colors">
-                        <td className="px-10 py-6 whitespace-nowrap">
-                          <span className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest ${r.status === 'completed' ? 'bg-emerald-100 text-emerald-700' :
-                            r.status === 'pending' ? 'bg-amber-100 text-amber-700' : 'bg-rose-100 text-rose-700'
-                            }`}>
-                            {r.status === 'completed' ? '已核銷' : r.status === 'pending' ? '待處理' : '已取消'}
-                          </span>
-                        </td>
-                        <td className="px-10 py-6 whitespace-nowrap font-black text-slate-800">
-                          {students.find(s => s.id === r.userId)?.name || '未知學員'}
-                        </td>
-                        <td className="px-10 py-6 whitespace-nowrap font-bold text-slate-600">{r.productName}</td>
-                        <td className="px-10 py-6 whitespace-nowrap text-indigo-600 font-black">{r.pointsSpent} PTS</td>
-                        <td className="px-10 py-6 whitespace-nowrap text-slate-400 text-sm font-bold">
-                          {r.timestamp ? new Date(r.timestamp).toLocaleDateString() : '無日期'}
-                        </td>
-                        <td className="px-10 py-6 whitespace-nowrap">
-                          {r.status === 'pending' ? (
-                            <button
-                              onClick={() => handleConfirmRedemption(r.id)}
-                              className="text-white bg-indigo-600 hover:bg-indigo-700 px-5 py-2.5 rounded-xl text-xs font-black transition-all shadow-xl shadow-indigo-100 active:scale-95"
-                            >
-                              立即核銷
-                            </button>
-                          ) : (
-                            <div className="flex items-center gap-2 text-slate-300 font-black text-[10px] tracking-widest">
-                              <Check size={14} /> FINISHED
-                            </div>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  } catch (err) {
-                    console.error("Row render error", err);
-                    return null;
-                  }
-                })}
-              </tbody>
-            </table>
-          </div>
-        </section>
-      )}
+          <div className="space-y-8">
+            <div>
+              <label className="block text-xs font-black text-slate-400 uppercase tracking-[0.2em] mb-4">第三步：調整點數金額</label>
+              <div className="relative">
+                <input
+                  type="number"
+                  value={pointAmount}
+                  onChange={e => setPointAmount(e.target.value)}
+                  className="w-full p-8 text-5xl font-black bg-slate-50 border-2 border-transparent rounded-[2rem] focus:bg-white focus:border-indigo-600 focus:ring-4 focus:ring-indigo-100 transition-all outline-none text-indigo-600 shadow-inner"
+                />
+                <div className="absolute right-8 top-1/2 -translate-y-1/2 flex items-center gap-2 pointer-events-none">
+                  <span className="font-black text-slate-300 text-2xl uppercase tracking-tighter">PTS</span>
+                </div>
+              </div>
+            </div>
 
-      {activeTab === 'banners' && (
-        <div className="bg-white rounded-[3rem] p-12 border border-slate-100 shadow-xl animate-in slide-in-from-bottom-4">
-          <div className="flex justify-between items-center mb-8">
-            <h2 className="text-3xl font-black text-slate-800 flex items-center gap-3">
-              <ImageIcon className="text-indigo-600" /> 廣告牆管理
-            </h2>
             <button
-              onClick={() => setIsAddingBanner(!isAddingBanner)}
-              className="bg-indigo-600 text-white px-5 py-3 rounded-xl font-bold flex items-center gap-2 hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100"
+              onClick={handleIssuePoints}
+              className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black py-8 rounded-[2rem] transition-all shadow-2xl shadow-emerald-200 flex items-center justify-center gap-4 text-2xl active:scale-95 group"
             >
-              <Plus size={20} /> 新增廣告
+              <Check size={32} className="group-hover:scale-125 transition-transform" />
+              確認核發獎勵
             </button>
-          </div>
-
-          {isAddingBanner && (
-            <div className="bg-slate-50 p-6 rounded-2xl mb-8 border border-slate-200 animate-in fade-in">
-              <h3 className="font-black text-slate-700 mb-4">上傳廣告圖片與設定標籤</h3>
-              <div className="flex flex-col gap-4">
-                <div className="flex flex-col md:flex-row gap-4 items-start">
-                  <label className="flex-1 w-full flex items-center justify-center gap-2 p-10 rounded-[2rem] border-2 border-dashed border-slate-300 hover:border-indigo-400 hover:bg-indigo-50 transition-all cursor-pointer font-bold text-slate-500 hover:text-indigo-600">
-                    <Upload size={24} />
-                    {newBannerImage ? '已選好精美圖片' : '選擇廣告圖片檔案 (500KB內)'}
-                    <input type="file" className="hidden" accept="image/*" onChange={handleBannerImageSelect} />
-                  </label>
-
-                  <div className="w-full md:w-64 space-y-4">
-                    <label className="block text-xs font-black text-slate-400 uppercase tracking-widest">廣告標籤 (可自訂內容)</label>
-                    <input
-                      list="banner-tags"
-                      value={newBannerTag}
-                      onChange={(e) => setNewBannerTag(e.target.value)}
-                      placeholder="輸入或選擇標籤..."
-                      className="w-full p-4 rounded-2xl border-2 border-slate-100 font-bold text-slate-700 outline-none focus:border-indigo-500 transition-all shadow-sm"
-                    />
-                    <datalist id="banner-tags">
-                      <option value="精選推薦" />
-                      <option value="新品上架" />
-                      <option value="特價出清" />
-                      <option value="限時活動" />
-                      <option value="最新公告" />
-                    </datalist>
-                    {bannerPreview && <img src={bannerPreview} className="h-32 w-full object-cover rounded-2xl border border-white shadow-lg" alt="preview" />}
-                  </div>
-                </div>
-
-                <button
-                  onClick={async () => {
-                    if (newBannerImage) {
-                      await addBanner(newBannerImage, newBannerTag);
-                      setNewBannerImage('');
-                      setNewBannerTag('精選推薦');
-                      setBannerPreview(null);
-                      setIsAddingBanner(false);
-                      showAlert('廣告新增成功！', 'success');
-                    } else {
-                      showAlert('請先選擇圖片檔案喔', 'error');
-                    }
-                  }}
-                  className="bg-emerald-600 text-white px-6 py-4 rounded-2xl font-black text-lg hover:bg-emerald-700 shadow-xl shadow-emerald-100 active:scale-95"
-                >
-                  確認發布廣告
-                </button>
-              </div>
-            </div>
-          )}
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6">
-            {banners.map(banner => (
-              <div key={banner.id} className="relative group rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl transition-all">
-                <img src={banner.imageUrl} alt="banner" className="w-full h-48 object-cover" />
-                <div className="absolute top-4 left-4">
-                  <span className="bg-indigo-600/90 backdrop-blur text-white px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider shadow-lg">
-                    {banner.tag || '精選推薦'}
-                  </span>
-                </div>
-                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center">
-                  <button
-                    onClick={async () => {
-                      if (confirm('確定要移除此廣告嗎？')) {
-                        await deleteBanner(banner.id);
-                        showAlert('已移除廣告', 'success');
-                      }
-                    }}
-                    className="bg-white text-rose-500 px-6 py-2 rounded-xl font-black hover:bg-rose-50"
-                  >
-                    移 除
-                  </button>
-                </div>
-              </div>
-            ))}
-            {banners.length === 0 && (
-              <div className="col-span-full py-12 text-center text-slate-400 font-bold bg-slate-50 rounded-2xl border border-slate-200 border-dashed">
-                目前沒有廣告，新增一個來宣傳商品吧！
-              </div>
-            )}
           </div>
         </div>
       )}
 
-      {activeTab === 'missions' && (
-        <div className="bg-white rounded-[3rem] p-12 border border-slate-100 shadow-xl animate-in slide-in-from-bottom-4">
-          <div className="flex justify-between items-center mb-8">
-            <h2 className="text-3xl font-black text-slate-800 flex items-center gap-3">
-              <Target className="text-indigo-600" /> 任務管理系統
+      {
+        activeTab === 'approval' && (
+          <div className="bg-white rounded-[3rem] p-12 border border-slate-100 shadow-xl animate-in slide-in-from-bottom-4">
+            <h2 className="text-3xl font-black text-slate-800 mb-8 flex items-center gap-3">
+              <UserPlus className="text-indigo-600" />
+              註冊審核
+              <span className="bg-indigo-100 text-indigo-600 text-sm px-3 py-1 rounded-full">{pendingStudents.length} 待處裡</span>
             </h2>
+
+            <div className="space-y-4">
+              {pendingStudents.length === 0 ? (
+                <div className="text-center py-20 text-slate-400 font-bold">目前沒有待審核的註冊申請</div>
+              ) : (
+                pendingStudents.map(student => (
+                  <div key={student.id} className="flex items-center justify-between p-6 bg-slate-50 rounded-2xl border border-slate-100">
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 bg-indigo-200 rounded-full flex items-center justify-center text-indigo-700 font-bold text-xl">
+                        {student.name[0]}
+                      </div>
+                      <div>
+                        <h3 className="font-black text-lg text-slate-800">{student.name}</h3>
+                        <p className="text-slate-500 text-sm font-bold">{student.grade || '未填寫年級'}</p>
+                      </div>
+                    </div>
+                    <div className="flex gap-3">
+                      <button
+                        onClick={() => handleApprove(student.id)}
+                        className="bg-emerald-500 hover:bg-emerald-600 text-white px-6 py-2 rounded-xl font-bold transition-all shadow-lg shadow-emerald-100"
+                      >
+                        核准
+                      </button>
+                      <button
+                        onClick={() => handleDelete(student.id)}
+                        className="bg-slate-200 hover:bg-rose-500 hover:text-white text-slate-500 px-6 py-2 rounded-xl font-bold transition-all"
+                      >
+                        拒絕
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        )
+      }
+
+      {
+        activeTab === 'products' && (
+          <div className="bg-white rounded-[3rem] p-12 border border-slate-100 shadow-xl animate-in slide-in-from-bottom-4">
+            <div className="flex justify-between items-center mb-8">
+              <h2 className="text-3xl font-black text-slate-800 flex items-center gap-3">
+                <Package className="text-indigo-600" /> 商品管理系統
+              </h2>
+              <div className="flex items-center gap-4">
+                <button
+                  onClick={() => setIsManagingCats(!isManagingCats)}
+                  className="bg-slate-100 text-slate-600 px-5 py-3 rounded-xl font-bold flex items-center gap-2 hover:bg-slate-200 transition-all border border-slate-200"
+                >
+                  <Target size={18} /> 分類管理
+                </button>
+                <button
+                  onClick={() => setIsAddingProduct(!isAddingProduct)}
+                  className="bg-indigo-600 text-white px-5 py-3 rounded-xl font-bold flex items-center gap-2 hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100"
+                >
+                  <Plus size={20} /> 上架新品
+                </button>
+              </div>
+            </div>
+
+            {isManagingCats && (
+              <div className="bg-slate-50 p-6 rounded-2xl mb-8 border border-slate-200 animate-in fade-in">
+                <h3 className="font-black text-slate-700 mb-4">商品分類管理</h3>
+                <div className="flex gap-4 mb-6">
+                  <input
+                    placeholder="輸入新分類名稱 (例如: 夏季限定)"
+                    value={newCatName}
+                    onChange={e => setNewCatName(e.target.value)}
+                    className="flex-1 p-3 rounded-xl border border-slate-200 font-bold outline-none"
+                  />
+                  <button
+                    onClick={() => {
+                      if (newCatName) {
+                        addProductCategory(newCatName);
+                        setNewCatName('');
+                      }
+                    }}
+                    className="bg-emerald-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-emerald-700"
+                  >
+                    新增分類
+                  </button>
+                </div>
+                <div className="flex flex-wrap gap-3">
+                  {categories.map(cat => (
+                    <div key={cat.id} className="bg-white px-4 py-2 rounded-xl border border-slate-200 flex items-center gap-2 shadow-sm font-bold text-slate-600">
+                      {cat.name}
+                      <button onClick={() => deleteProductCategory(cat.id)} className="text-slate-300 hover:text-rose-500">
+                        <X size={14} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {isAddingProduct && (
+              <form onSubmit={handleAddProduct} className="bg-slate-50 p-6 rounded-2xl mb-8 border border-slate-200 animate-in fade-in">
+                <h3 className="font-black text-slate-700 mb-4">輸入新商品資訊</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                  <input
+                    placeholder="商品名稱"
+                    value={newProductName}
+                    onChange={e => setNewProductName(e.target.value)}
+                    className="p-3 rounded-xl border border-slate-200 font-bold outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                  <select
+                    value={newProductCategory}
+                    onChange={e => setNewProductCategory(e.target.value)}
+                    className="p-3 rounded-xl border border-slate-200 font-bold outline-none focus:ring-2 focus:ring-indigo-500"
+                  >
+                    {categories.map(cat => (
+                      <option key={cat.id} value={cat.name}>{cat.name}</option>
+                    ))}
+                    {categories.length === 0 && <option value="">請先新增分類</option>}
+                  </select>
+                  <div className="flex flex-col gap-2">
+                    <label className="flex items-center justify-center gap-2 p-3 rounded-xl border-2 border-dashed border-slate-300 hover:border-indigo-400 hover:bg-indigo-50 transition-all cursor-pointer font-bold text-slate-500 hover:text-indigo-600">
+                      <Upload size={18} />
+                      {newProductImage ? '已選擇圖片' : '上傳商品圖片 (200KB內)'}
+                      <input type="file" className="hidden" accept="image/*" onChange={handleProductImageSelect} />
+                    </label>
+                    {imagePreview && <img src={imagePreview} className="h-20 w-auto object-cover rounded-lg border border-slate-200" alt="preview" />}
+                  </div>
+                  <input
+                    placeholder="價格 (點數)"
+                    type="number"
+                    value={newProductPrice}
+                    onChange={e => setNewProductPrice(e.target.value)}
+                    className="p-3 rounded-xl border border-slate-200 font-bold outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                  <textarea
+                    placeholder="商品介紹 (可選)"
+                    value={newProductDescription}
+                    onChange={e => setNewProductDescription(e.target.value)}
+                    className="p-3 rounded-xl border border-slate-200 font-bold outline-none focus:ring-2 focus:ring-indigo-500 md:col-span-2 h-24"
+                  />
+                  <input
+                    placeholder="庫存數量"
+                    type="number"
+                    value={newProductStock}
+                    onChange={e => setNewProductStock(e.target.value)}
+                    className="p-3 rounded-xl border border-slate-200 font-bold outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
+                <div className="flex justify-end gap-2">
+                  <button type="button" onClick={() => setIsAddingProduct(false)} className="px-4 py-2 text-slate-400 font-bold hover:text-slate-600">取消</button>
+                  <button type="submit" className="px-6 py-2 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700">確認上架</button>
+                </div>
+              </form>
+            )}
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {products.map((product) => (
+                <div key={product.id} className="border border-slate-100 rounded-[2rem] p-6 flex flex-col gap-4 group hover:shadow-xl transition-all bg-white relative">
+                  <div className="flex gap-4 items-center">
+                    <img src={product.imageUrl} alt={product.name} className="w-20 h-20 rounded-2xl object-cover shadow-sm" />
+                    <div className="flex-1">
+                      <h4 className="font-black text-slate-800 text-lg">{product.name}</h4>
+                      <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">{product.category}</p>
+                      <p className="text-indigo-600 font-black">{product.price} PTS</p>
+                    </div>
+                    <button
+                      onClick={() => handleDeleteProduct(product.id)}
+                      className="p-2 text-slate-300 hover:text-rose-500 transition-colors"
+                    >
+                      <Trash2 size={18} />
+                    </button>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-4 border-t border-slate-50">
+                    <div className="flex flex-col">
+                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-tighter mb-1">庫存管理</span>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="number"
+                          defaultValue={product.stock}
+                          onBlur={(e) => handleUpdateStock(product.id, parseInt(e.target.value) || 0)}
+                          className="w-16 p-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-black text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500"
+                        />
+                        <span className={`text-[10px] font-black px-2 py-1 rounded-lg ${product.stock > 0 ? 'bg-emerald-100 text-emerald-600' : 'bg-red-100 text-red-600'}`}>
+                          {product.stock > 0 ? 'ON SALE' : 'SOLD OUT'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )
+      }
+
+      {
+        activeTab === 'mission_approval' && (
+          <div className="bg-white rounded-[3rem] p-12 border border-slate-100 shadow-xl animate-in slide-in-from-bottom-4">
+            <h2 className="text-3xl font-black text-slate-800 mb-8 flex items-center gap-3">
+              <CheckCircle className="text-emerald-600" />
+              任務提交審核
+              <span className="bg-emerald-100 text-emerald-600 text-sm px-3 py-1 rounded-full">{submissions.filter(s => s.status === 'pending').length} 待處裡</span>
+            </h2>
+
+            <div className="space-y-6">
+              {submissions.filter(s => s.status === 'pending').length === 0 ? (
+                <div className="text-center py-24 text-slate-400 font-bold bg-slate-50 rounded-[3rem] border border-slate-100 border-dashed">
+                  目前沒有待審核的任務提交
+                </div>
+              ) : (
+                submissions.filter(s => s.status === 'pending').map(sub => (
+                  <div key={sub.id} className="bg-slate-50 p-8 rounded-[2.5rem] border border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-6">
+                    <div className="flex items-center gap-6">
+                      <div className="w-16 h-16 bg-white rounded-2xl shadow-sm flex items-center justify-center text-2xl font-black text-indigo-600 border border-slate-100">
+                        {sub.userName[0]}
+                      </div>
+                      <div>
+                        <h3 className="text-xl font-black text-slate-800">{sub.userName}</h3>
+                        <p className="text-slate-500 font-bold flex items-center gap-2">
+                          提交了任務：<span className="text-indigo-600">「{sub.missionTitle}」</span>
+                        </p>
+                        <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mt-2">
+                          獎勵點數：{sub.points} PTS • 提交時間：{new Date(sub.timestamp).toLocaleString()}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex gap-4">
+                      <button
+                        onClick={() => handleApproveMission(sub.id)}
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white px-8 py-3 rounded-2xl font-black transition-all shadow-xl shadow-emerald-100 flex items-center gap-2"
+                      >
+                        <Check size={20} /> 核准發放
+                      </button>
+                      <button
+                        onClick={() => handleRejectMission(sub.id)}
+                        className="bg-white hover:bg-rose-50 text-slate-400 hover:text-rose-600 px-8 py-3 rounded-2xl font-black transition-all border border-slate-200"
+                      >
+                        不予核准
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        )
+      }
+
+      {
+        activeTab === 'scan' && (
+          <div className="bg-white rounded-[3rem] p-16 border border-slate-100 text-center shadow-xl animate-in fade-in">
+            <div className="bg-indigo-50 w-32 h-32 rounded-[2.5rem] flex items-center justify-center mx-auto mb-8 text-indigo-600 shadow-inner">
+              <Camera size={56} />
+            </div>
+            <h2 className="text-3xl font-black text-slate-800 mb-4 tracking-tight">QR Code 核銷中心</h2>
+            <p className="text-slate-400 mb-8 font-medium max-w-md mx-auto leading-relaxed">攝像頭已就緒。請將學員的 QR Code 對準下方區域，系統將自動辨識並進行核銷。</p>
+
+            <div className="max-w-md mx-auto mb-8 overflow-hidden rounded-[2rem] border-4 border-indigo-50 shadow-inner">
+              <div id="reader" className="w-full"></div>
+            </div>
+
+            <div className="max-w-md mx-auto mb-8">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="h-px bg-slate-200 flex-1"></div>
+                <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest">或手動輸入對應字串</span>
+                <div className="h-px bg-slate-200 flex-1"></div>
+              </div>
+              <input
+                type="text"
+                placeholder="貼上 QR Code 代碼..."
+                value={scanInput}
+                onChange={(e) => setScanInput(e.target.value)}
+                className="w-full p-4 bg-slate-50 border-2 border-indigo-50 rounded-2xl focus:bg-white focus:border-indigo-600 outline-none font-mono text-xs text-slate-500 text-center"
+              />
+            </div>
+
             <button
-              onClick={() => setIsAddingMission(!isAddingMission)}
-              className="bg-indigo-600 text-white px-5 py-3 rounded-xl font-bold flex items-center gap-2 hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100"
+              onClick={() => handleStartScan()}
+              disabled={isScanning}
+              className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 text-white px-16 py-6 rounded-[2rem] font-black transition-all shadow-2xl shadow-indigo-200 inline-flex items-center justify-center gap-4 text-xl active:scale-95"
             >
-              <Plus size={18} /> 新增任務
+              {isScanning ? '正在比對資料庫...' : '確認代碼並核銷'}
             </button>
           </div>
+        )
+      }
 
-          {isAddingMission && (
-            <form onSubmit={handleAddMission} className="bg-slate-50 p-6 rounded-2xl mb-8 border border-slate-200 animate-in fade-in">
-              <h3 className="font-black text-slate-700 mb-4">建立新挑戰</h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                <input
-                  placeholder="任務名稱"
-                  value={newMissionTitle}
-                  onChange={e => setNewMissionTitle(e.target.value)}
-                  className="p-3 rounded-xl border border-slate-200 font-bold outline-none focus:ring-2 focus:ring-indigo-500"
-                />
-                <input
-                  placeholder="獎勵點數"
-                  type="number"
-                  value={newMissionPoints}
-                  onChange={e => setNewMissionPoints(e.target.value)}
-                  className="p-3 rounded-xl border border-slate-200 font-bold outline-none focus:ring-2 focus:ring-indigo-500"
-                />
-                <select
-                  value={newMissionType}
-                  onChange={e => setNewMissionType(e.target.value as any)}
-                  className="p-3 rounded-xl border border-slate-200 font-bold outline-none focus:ring-2 focus:ring-indigo-500"
-                >
-                  <option value="normal">一般任務</option>
-                  <option value="challenge">挑戰任務</option>
-                  <option value="hard">困難任務</option>
-                </select>
-                <div className="flex items-center gap-2 p-3 bg-white rounded-xl border border-slate-200">
-                  <Clock size={18} className="text-slate-400" />
+      {
+        activeTab === 'history' && (
+          <section className="bg-white rounded-[3rem] border border-slate-100 shadow-xl overflow-hidden animate-in fade-in">
+            <div className="p-10 border-b border-slate-50 flex flex-col md:flex-row md:items-center justify-between gap-6">
+              <h2 className="font-black text-2xl text-slate-800 flex items-center gap-3">
+                <HistoryIcon className="text-indigo-600" />
+                全體兌換日誌
+              </h2>
+              <div className="flex flex-col md:flex-row gap-4 items-center">
+                <div className="relative">
                   <input
-                    type="datetime-local"
-                    value={newMissionDeadline}
-                    onChange={e => setNewMissionDeadline(e.target.value)}
-                    className="font-bold outline-none text-slate-600 w-full"
-                    placeholder="截止日期 (可選)"
+                    type="month"
+                    value={selectedMonth}
+                    onChange={(e) => setSelectedMonth(e.target.value)}
+                    className="pl-5 pr-5 py-4 rounded-2xl bg-slate-50 border-2 border-transparent focus:bg-white focus:border-indigo-600 focus:ring-4 focus:ring-indigo-100 transition-all outline-none text-sm font-bold shadow-inner"
+                  />
+                </div>
+                <div className="relative">
+                  <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
+                  <input
+                    type="text"
+                    placeholder="搜尋學生、商品或流水號..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-14 pr-8 py-4 rounded-2xl bg-slate-50 border-2 border-transparent focus:bg-white focus:border-indigo-600 focus:ring-4 focus:ring-indigo-100 transition-all outline-none text-sm w-full md:w-80 shadow-inner font-bold"
                   />
                 </div>
               </div>
-              <div className="flex justify-end gap-3">
-                <button
-                  type="button"
-                  onClick={() => setIsAddingMission(false)}
-                  className="px-4 py-2 rounded-xl font-bold text-slate-400 hover:bg-slate-200 transition-all"
-                >
-                  取消
-                </button>
-                <button
-                  type="submit"
-                  className="bg-indigo-600 text-white px-6 py-2 rounded-xl font-bold hover:bg-indigo-700 transition-all shadow-lg"
-                >
-                  確認建立
-                </button>
-              </div>
-            </form>
-          )}
+            </div>
 
-          <div className="grid grid-cols-1 gap-4">
-            {missions.length === 0 && (
-              <div className="text-center py-12 text-slate-400 font-bold bg-slate-50 rounded-2xl border border-slate-100 border-dashed">
-                目前沒有任何任務，請點擊上方按鈕新增。
-              </div>
-            )}
-            {missions.map(mission => (
-              <div key={mission.id} className={`flex flex-col md:flex-row md:items-center justify-between p-6 rounded-2xl border transition-all ${mission.isActive ? 'bg-white border-slate-100 shadow-sm' : 'bg-slate-50 border-slate-100 opacity-60'}`}>
-                <div className="flex items-center gap-4 mb-4 md:mb-0">
-                  <div className={`w-12 h-12 rounded-xl flex items-center justify-center font-black text-lg shrink-0 ${mission.type === 'normal' ? 'bg-emerald-100 text-emerald-600' :
-                    mission.type === 'challenge' ? 'bg-orange-100 text-orange-600' :
-                      'bg-rose-100 text-rose-600'
-                    }`}>
-                    {mission.type === 'normal' ? 'N' : mission.type === 'challenge' ? 'C' : 'H'}
-                  </div>
-                  <div>
-                    <h3 className="font-black text-lg text-slate-800 flex items-center gap-2">
-                      {mission.title}
-                      {!mission.isActive && <span className="text-[10px] bg-slate-200 text-slate-500 px-2 py-0.5 rounded-full">已停用</span>}
-                    </h3>
-                    <p className="text-slate-400 text-sm font-bold flex items-center gap-2">
-                      <span className="text-indigo-500">{mission.points} PTS</span> • {mission.description}
-                      {mission.deadline && (
-                        <span className="flex items-center gap-1 text-amber-500 ml-2">
-                          <Clock size={14} /> {new Date(mission.deadline).toLocaleString()} 截止
-                        </span>
-                      )}
-                    </p>
-                  </div>
-                </div>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-slate-50/50">
+                  <tr>
+                    <th className="px-10 py-6 text-left text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">狀態</th>
+                    <th className="px-10 py-6 text-left text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">學員</th>
+                    <th className="px-10 py-6 text-left text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">兌換商品</th>
+                    <th className="px-10 py-6 text-left text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">扣點</th>
+                    <th className="px-10 py-6 text-left text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">日期</th>
+                    <th className="px-10 py-6 text-left text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">操作</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                  {filteredRedemptions.map(r => {
+                    try {
+                      return (
+                        <tr key={r.id} className="hover:bg-slate-50/50 transition-colors">
+                          <td className="px-10 py-6 whitespace-nowrap">
+                            <span className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest ${r.status === 'completed' ? 'bg-emerald-100 text-emerald-700' :
+                              r.status === 'pending' ? 'bg-amber-100 text-amber-700' : 'bg-rose-100 text-rose-700'
+                              }`}>
+                              {r.status === 'completed' ? '已核銷' : r.status === 'pending' ? '待處理' : '已取消'}
+                            </span>
+                          </td>
+                          <td className="px-10 py-6 whitespace-nowrap font-black text-slate-800">
+                            {students.find(s => s.id === r.userId)?.name || '未知學員'}
+                          </td>
+                          <td className="px-10 py-6 whitespace-nowrap font-bold text-slate-600">{r.productName}</td>
+                          <td className="px-10 py-6 whitespace-nowrap text-indigo-600 font-black">{r.pointsSpent} PTS</td>
+                          <td className="px-10 py-6 whitespace-nowrap text-slate-400 text-sm font-bold">
+                            {r.timestamp ? new Date(r.timestamp).toLocaleDateString() : '無日期'}
+                          </td>
+                          <td className="px-10 py-6 whitespace-nowrap">
+                            {r.status === 'pending' ? (
+                              <button
+                                onClick={() => handleConfirmRedemption(r.id)}
+                                className="text-white bg-indigo-600 hover:bg-indigo-700 px-5 py-2.5 rounded-xl text-xs font-black transition-all shadow-xl shadow-indigo-100 active:scale-95"
+                              >
+                                立即核銷
+                              </button>
+                            ) : (
+                              <div className="flex items-center gap-2 text-slate-300 font-black text-[10px] tracking-widest">
+                                <Check size={14} /> FINISHED
+                              </div>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    } catch (err) {
+                      console.error("Row render error", err);
+                      return null;
+                    }
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        )
+      }
 
-                <button
-                  onClick={() => handleToggleMission(mission.id)}
-                  className={`px-4 py-2 rounded-xl font-black text-xs transition-all whitespace-nowrap ${mission.isActive
-                    ? 'bg-rose-50 text-rose-600 hover:bg-rose-100'
-                    : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100'
-                    }`}
-                >
-                  {mission.isActive ? '停用任務' : '啟用任務'}
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      {
+        activeTab === 'banners' && (
+          <div className="bg-white rounded-[3rem] p-12 border border-slate-100 shadow-xl animate-in slide-in-from-bottom-4">
+            <div className="flex justify-between items-center mb-8">
+              <h2 className="text-3xl font-black text-slate-800 flex items-center gap-3">
+                <ImageIcon className="text-indigo-600" /> 廣告牆管理
+              </h2>
+              <button
+                onClick={() => setIsAddingBanner(!isAddingBanner)}
+                className="bg-indigo-600 text-white px-5 py-3 rounded-xl font-bold flex items-center gap-2 hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100"
+              >
+                <Plus size={20} /> 新增廣告
+              </button>
+            </div>
 
-      {activeTab === 'wishes' && (
-        <div className="bg-white rounded-[3rem] p-12 border border-slate-100 shadow-xl animate-in slide-in-from-bottom-4">
-          <h2 className="text-3xl font-black text-slate-800 mb-8 flex items-center gap-3">
-            <Heart className="text-pink-500" /> 許願池管理
-          </h2>
+            {isAddingBanner && (
+              <div className="bg-slate-50 p-6 rounded-2xl mb-8 border border-slate-200 animate-in fade-in">
+                <h3 className="font-black text-slate-700 mb-4">上傳廣告圖片與設定標籤</h3>
+                <div className="flex flex-col gap-4">
+                  <div className="flex flex-col md:flex-row gap-4 items-start">
+                    <label className="flex-1 w-full flex items-center justify-center gap-2 p-10 rounded-[2rem] border-2 border-dashed border-slate-300 hover:border-indigo-400 hover:bg-indigo-50 transition-all cursor-pointer font-bold text-slate-500 hover:text-indigo-600">
+                      <Upload size={24} />
+                      {newBannerImage ? '已選好精美圖片' : '選擇廣告圖片檔案 (500KB內)'}
+                      <input type="file" className="hidden" accept="image/*" onChange={handleBannerImageSelect} />
+                    </label>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {wishes.length === 0 ? (
-              <div className="col-span-full py-20 text-center text-slate-400 font-bold">目前還沒有人許願喔！</div>
-            ) : (
-              wishes.map(wish => (
-                <div key={wish.id} className="bg-slate-50 p-6 rounded-[2.5rem] border border-slate-100 relative group">
-                  <button
-                    onClick={() => handleDeleteWish(wish.id)}
-                    className="absolute top-4 right-4 p-2 bg-white rounded-full text-slate-300 hover:text-rose-500 hover:shadow-md transition-all opacity-0 group-hover:opacity-100"
-                  >
-                    <Trash2 size={18} />
-                  </button>
-                  <div className="flex items-center gap-4 mb-4">
-                    <img src={wish.userAvatar} className="w-12 h-12 rounded-full border-2 border-white shadow-sm" alt={wish.userName} />
-                    <div>
-                      <h4 className="font-black text-slate-800">{wish.userName}</h4>
-                      <p className="text-[10px] text-slate-400 font-bold">{new Date(wish.timestamp).toLocaleString()}</p>
+                    <div className="w-full md:w-64 space-y-4">
+                      <label className="block text-xs font-black text-slate-400 uppercase tracking-widest">廣告標籤 (可自訂內容)</label>
+                      <input
+                        list="banner-tags"
+                        value={newBannerTag}
+                        onChange={(e) => setNewBannerTag(e.target.value)}
+                        placeholder="輸入或選擇標籤..."
+                        className="w-full p-4 rounded-2xl border-2 border-slate-100 font-bold text-slate-700 outline-none focus:border-indigo-500 transition-all shadow-sm"
+                      />
+                      <datalist id="banner-tags">
+                        <option value="精選推薦" />
+                        <option value="新品上架" />
+                        <option value="特價出清" />
+                        <option value="限時活動" />
+                        <option value="最新公告" />
+                      </datalist>
+                      {bannerPreview && <img src={bannerPreview} className="h-32 w-full object-cover rounded-2xl border border-white shadow-lg" alt="preview" />}
                     </div>
                   </div>
-                  <h3 className="text-xl font-black text-slate-800 mb-2">想要：{wish.itemName}</h3>
-                  <p className="text-slate-500 text-sm mb-6 leading-relaxed italic">"{wish.description}"</p>
-                  <div className="flex items-center gap-2 text-pink-500 font-black text-sm">
-                    <Heart size={16} fill="currentColor" /> {wish.likedBy?.length || 0} 人集氣中
+
+                  <button
+                    onClick={async () => {
+                      if (newBannerImage) {
+                        await addBanner(newBannerImage, newBannerTag);
+                        setNewBannerImage('');
+                        setNewBannerTag('精選推薦');
+                        setBannerPreview(null);
+                        setIsAddingBanner(false);
+                        showAlert('廣告新增成功！', 'success');
+                      } else {
+                        showAlert('請先選擇圖片檔案喔', 'error');
+                      }
+                    }}
+                    className="bg-emerald-600 text-white px-6 py-4 rounded-2xl font-black text-lg hover:bg-emerald-700 shadow-xl shadow-emerald-100 active:scale-95"
+                  >
+                    確認發布廣告
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6">
+              {banners.map(banner => (
+                <div key={banner.id} className="relative group rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl transition-all">
+                  <img src={banner.imageUrl} alt="banner" className="w-full h-48 object-cover" />
+                  <div className="absolute top-4 left-4">
+                    <span className="bg-indigo-600/90 backdrop-blur text-white px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider shadow-lg">
+                      {banner.tag || '精選推薦'}
+                    </span>
+                  </div>
+                  <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center">
+                    <button
+                      onClick={async () => {
+                        if (confirm('確定要移除此廣告嗎？')) {
+                          await deleteBanner(banner.id);
+                          showAlert('已移除廣告', 'success');
+                        }
+                      }}
+                      className="bg-white text-rose-500 px-6 py-2 rounded-xl font-black hover:bg-rose-50"
+                    >
+                      移 除
+                    </button>
                   </div>
                 </div>
-              ))
-            )}
-          </div>
-        </div>
-      )}
-
-      {isScanning && (
-        <div className="fixed inset-0 z-[150] bg-slate-900/95 backdrop-blur-xl flex flex-col items-center justify-center p-8">
-          <div className="relative w-full max-w-lg aspect-square border-8 border-white/5 rounded-[5rem] overflow-hidden shadow-[0_0_100px_rgba(79,70,229,0.3)]">
-            <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-indigo-900/20 to-slate-900 flex items-center justify-center">
-              <div className="text-center">
-                <ScanLine size={140} className="mx-auto mb-10 animate-pulse text-indigo-400" />
-                <p className="text-3xl font-black text-white mb-4 tracking-tight">搜尋有效條碼中...</p>
-                <p className="text-indigo-300 font-bold tracking-widest uppercase text-xs">AI Computer Vision Active</p>
-              </div>
+              ))}
+              {banners.length === 0 && (
+                <div className="col-span-full py-12 text-center text-slate-400 font-bold bg-slate-50 rounded-2xl border border-slate-200 border-dashed">
+                  目前沒有廣告，新增一個來宣傳商品吧！
+                </div>
+              )}
             </div>
-            <div className="absolute top-0 left-0 w-full h-3 bg-indigo-400 shadow-[0_0_50px_rgba(129,140,248,1)] animate-scan-line"></div>
           </div>
-          <button
-            onClick={() => setIsScanning(false)}
-            className="mt-16 bg-white/5 hover:bg-white/10 text-white px-12 py-5 rounded-[2rem] font-black transition-all border border-white/10 flex items-center gap-4 text-lg backdrop-blur"
-          >
-            <X size={24} /> 取消掃描
-          </button>
-          <style>{`
+        )
+      }
+
+      {
+        activeTab === 'missions' && (
+          <div className="bg-white rounded-[3rem] p-12 border border-slate-100 shadow-xl animate-in slide-in-from-bottom-4">
+            <div className="flex justify-between items-center mb-8">
+              <h2 className="text-3xl font-black text-slate-800 flex items-center gap-3">
+                <Target className="text-indigo-600" /> 任務管理系統
+              </h2>
+              <button
+                onClick={() => setIsAddingMission(!isAddingMission)}
+                className="bg-indigo-600 text-white px-5 py-3 rounded-xl font-bold flex items-center gap-2 hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100"
+              >
+                <Plus size={18} /> 新增任務
+              </button>
+            </div>
+
+            {isAddingMission && (
+              <form onSubmit={handleAddMission} className="bg-slate-50 p-6 rounded-2xl mb-8 border border-slate-200 animate-in fade-in">
+                <h3 className="font-black text-slate-700 mb-4">建立新挑戰</h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                  <input
+                    placeholder="任務名稱"
+                    value={newMissionTitle}
+                    onChange={e => setNewMissionTitle(e.target.value)}
+                    className="p-3 rounded-xl border border-slate-200 font-bold outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                  <input
+                    placeholder="獎勵點數"
+                    type="number"
+                    value={newMissionPoints}
+                    onChange={e => setNewMissionPoints(e.target.value)}
+                    className="p-3 rounded-xl border border-slate-200 font-bold outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                  <select
+                    value={newMissionType}
+                    onChange={e => setNewMissionType(e.target.value as any)}
+                    className="p-3 rounded-xl border border-slate-200 font-bold outline-none focus:ring-2 focus:ring-indigo-500"
+                  >
+                    <option value="normal">一般任務</option>
+                    <option value="challenge">挑戰任務</option>
+                    <option value="hard">困難任務</option>
+                  </select>
+                  <div className="flex items-center gap-2 p-3 bg-white rounded-xl border border-slate-200">
+                    <Clock size={18} className="text-slate-400" />
+                    <input
+                      type="datetime-local"
+                      value={newMissionDeadline}
+                      onChange={e => setNewMissionDeadline(e.target.value)}
+                      className="font-bold outline-none text-slate-600 w-full"
+                      placeholder="截止日期 (可選)"
+                    />
+                  </div>
+                </div>
+                <div className="flex justify-end gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setIsAddingMission(false)}
+                    className="px-4 py-2 rounded-xl font-bold text-slate-400 hover:bg-slate-200 transition-all"
+                  >
+                    取消
+                  </button>
+                  <button
+                    type="submit"
+                    className="bg-indigo-600 text-white px-6 py-2 rounded-xl font-bold hover:bg-indigo-700 transition-all shadow-lg"
+                  >
+                    確認建立
+                  </button>
+                </div>
+              </form>
+            )}
+
+            <div className="grid grid-cols-1 gap-4">
+              {missions.length === 0 && (
+                <div className="text-center py-12 text-slate-400 font-bold bg-slate-50 rounded-2xl border border-slate-100 border-dashed">
+                  目前沒有任何任務，請點擊上方按鈕新增。
+                </div>
+              )}
+              {missions.map(mission => (
+                <div key={mission.id} className={`flex flex-col md:flex-row md:items-center justify-between p-6 rounded-2xl border transition-all ${mission.isActive ? 'bg-white border-slate-100 shadow-sm' : 'bg-slate-50 border-slate-100 opacity-60'}`}>
+                  <div className="flex items-center gap-4 mb-4 md:mb-0">
+                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center font-black text-lg shrink-0 ${mission.type === 'normal' ? 'bg-emerald-100 text-emerald-600' :
+                      mission.type === 'challenge' ? 'bg-orange-100 text-orange-600' :
+                        'bg-rose-100 text-rose-600'
+                      }`}>
+                      {mission.type === 'normal' ? 'N' : mission.type === 'challenge' ? 'C' : 'H'}
+                    </div>
+                    <div>
+                      <h3 className="font-black text-lg text-slate-800 flex items-center gap-2">
+                        {mission.title}
+                        {!mission.isActive && <span className="text-[10px] bg-slate-200 text-slate-500 px-2 py-0.5 rounded-full">已停用</span>}
+                      </h3>
+                      <p className="text-slate-400 text-sm font-bold flex items-center gap-2">
+                        <span className="text-indigo-500">{mission.points} PTS</span> • {mission.description}
+                        {mission.deadline && (
+                          <span className="flex items-center gap-1 text-amber-500 ml-2">
+                            <Clock size={14} /> {new Date(mission.deadline).toLocaleString()} 截止
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => handleToggleMission(mission.id)}
+                    className={`px-4 py-2 rounded-xl font-black text-xs transition-all whitespace-nowrap ${mission.isActive
+                      ? 'bg-rose-50 text-rose-600 hover:bg-rose-100'
+                      : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100'
+                      }`}
+                  >
+                    {mission.isActive ? '停用任務' : '啟用任務'}
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )
+      }
+
+      {
+        activeTab === 'wishes' && (
+          <div className="bg-white rounded-[3rem] p-12 border border-slate-100 shadow-xl animate-in slide-in-from-bottom-4">
+            <h2 className="text-3xl font-black text-slate-800 mb-8 flex items-center gap-3">
+              <Heart className="text-pink-500" /> 許願池管理
+            </h2>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {wishes.length === 0 ? (
+                <div className="col-span-full py-20 text-center text-slate-400 font-bold">目前還沒有人許願喔！</div>
+              ) : (
+                wishes.map(wish => (
+                  <div key={wish.id} className="bg-slate-50 p-6 rounded-[2.5rem] border border-slate-100 relative group">
+                    <button
+                      onClick={() => handleDeleteWish(wish.id)}
+                      className="absolute top-4 right-4 p-2 bg-white rounded-full text-slate-300 hover:text-rose-500 hover:shadow-md transition-all opacity-0 group-hover:opacity-100"
+                    >
+                      <Trash2 size={18} />
+                    </button>
+                    <div className="flex items-center gap-4 mb-4">
+                      <img src={wish.userAvatar} className="w-12 h-12 rounded-full border-2 border-white shadow-sm" alt={wish.userName} />
+                      <div>
+                        <h4 className="font-black text-slate-800">{wish.userName}</h4>
+                        <p className="text-[10px] text-slate-400 font-bold">{new Date(wish.timestamp).toLocaleString()}</p>
+                      </div>
+                    </div>
+                    <h3 className="text-xl font-black text-slate-800 mb-2">想要：{wish.itemName}</h3>
+                    <p className="text-slate-500 text-sm mb-6 leading-relaxed italic">"{wish.description}"</p>
+                    <div className="flex items-center gap-2 text-pink-500 font-black text-sm">
+                      <Heart size={16} fill="currentColor" /> {wish.likedBy?.length || 0} 人集氣中
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        )
+      }
+
+      {
+        isScanning && (
+          <div className="fixed inset-0 z-[150] bg-slate-900/95 backdrop-blur-xl flex flex-col items-center justify-center p-8">
+            <div className="relative w-full max-w-lg aspect-square border-8 border-white/5 rounded-[5rem] overflow-hidden shadow-[0_0_100px_rgba(79,70,229,0.3)]">
+              <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-indigo-900/20 to-slate-900 flex items-center justify-center">
+                <div className="text-center">
+                  <ScanLine size={140} className="mx-auto mb-10 animate-pulse text-indigo-400" />
+                  <p className="text-3xl font-black text-white mb-4 tracking-tight">搜尋有效條碼中...</p>
+                  <p className="text-indigo-300 font-bold tracking-widest uppercase text-xs">AI Computer Vision Active</p>
+                </div>
+              </div>
+              <div className="absolute top-0 left-0 w-full h-3 bg-indigo-400 shadow-[0_0_50px_rgba(129,140,248,1)] animate-scan-line"></div>
+            </div>
+            <button
+              onClick={() => setIsScanning(false)}
+              className="mt-16 bg-white/5 hover:bg-white/10 text-white px-12 py-5 rounded-[2rem] font-black transition-all border border-white/10 flex items-center gap-4 text-lg backdrop-blur"
+            >
+              <X size={24} /> 取消掃描
+            </button>
+            <style>{`
             @keyframes scan-line {
               0% { top: 0% }
               100% { top: 100% }
@@ -1357,51 +1409,54 @@ const Admin: React.FC<AdminProps> = ({ onRefresh }) => {
               animation: scan-line 3s linear infinite;
             }
           `}</style>
-        </div>
-      )}
+          </div>
+        )
+      }
 
-      {scanResult && (
-        <div className="fixed inset-0 z-[160] flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-2xl">
-          <div className="bg-white rounded-[4rem] max-w-md w-full p-12 shadow-[0_0_80px_rgba(0,0,0,0.5)] animate-in zoom-in-95 duration-200">
-            <div className="bg-emerald-50 w-24 h-24 rounded-[2rem] flex items-center justify-center text-emerald-600 mb-10 mx-auto shadow-inner">
-              <ShieldCheck size={48} />
-            </div>
-            <h2 className="text-3xl font-black text-slate-800 text-center mb-10 tracking-tight">驗證成功！</h2>
+      {
+        scanResult && (
+          <div className="fixed inset-0 z-[160] flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-2xl">
+            <div className="bg-white rounded-[4rem] max-w-md w-full p-12 shadow-[0_0_80px_rgba(0,0,0,0.5)] animate-in zoom-in-95 duration-200">
+              <div className="bg-emerald-50 w-24 h-24 rounded-[2rem] flex items-center justify-center text-emerald-600 mb-10 mx-auto shadow-inner">
+                <ShieldCheck size={48} />
+              </div>
+              <h2 className="text-3xl font-black text-slate-800 text-center mb-10 tracking-tight">驗證成功！</h2>
 
-            <div className="bg-slate-50 rounded-[2.5rem] p-8 space-y-6 mb-12 border border-slate-100 shadow-inner">
-              <div className="flex justify-between items-center py-2 border-b border-slate-200/50">
-                <span className="text-slate-400 text-[10px] font-black uppercase tracking-widest">申請學員</span>
-                <span className="font-black text-slate-800 text-xl">{students.find(s => s.id === scanResult.userId)?.name}</span>
+              <div className="bg-slate-50 rounded-[2.5rem] p-8 space-y-6 mb-12 border border-slate-100 shadow-inner">
+                <div className="flex justify-between items-center py-2 border-b border-slate-200/50">
+                  <span className="text-slate-400 text-[10px] font-black uppercase tracking-widest">申請學員</span>
+                  <span className="font-black text-slate-800 text-xl">{students.find(s => s.id === scanResult.userId)?.name}</span>
+                </div>
+                <div className="flex justify-between items-center py-2 border-b border-slate-200/50">
+                  <span className="text-slate-400 text-[10px] font-black uppercase tracking-widest">兌換項目</span>
+                  <span className="font-black text-slate-800 text-xl">{scanResult.productName}</span>
+                </div>
+                <div className="flex justify-between items-center py-2">
+                  <span className="text-slate-400 text-[10px] font-black uppercase tracking-widest">核銷點數</span>
+                  <span className="font-black text-indigo-600 text-2xl">{scanResult.pointsSpent} <span className="text-xs font-bold text-indigo-400">PTS</span></span>
+                </div>
               </div>
-              <div className="flex justify-between items-center py-2 border-b border-slate-200/50">
-                <span className="text-slate-400 text-[10px] font-black uppercase tracking-widest">兌換項目</span>
-                <span className="font-black text-slate-800 text-xl">{scanResult.productName}</span>
-              </div>
-              <div className="flex justify-between items-center py-2">
-                <span className="text-slate-400 text-[10px] font-black uppercase tracking-widest">核銷點數</span>
-                <span className="font-black text-indigo-600 text-2xl">{scanResult.pointsSpent} <span className="text-xs font-bold text-indigo-400">PTS</span></span>
-              </div>
-            </div>
 
-            <div className="flex flex-col gap-4">
-              <button
-                onClick={() => handleConfirmRedemption(scanResult.id)}
-                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-black py-6 rounded-2xl transition-all shadow-2xl shadow-indigo-100 flex items-center justify-center gap-4 text-xl active:scale-95"
-              >
-                <Check size={28} />
-                確認發放獎勵
-              </button>
-              <button
-                onClick={() => setScanResult(null)}
-                className="w-full bg-slate-100 text-slate-600 font-bold py-5 rounded-2xl hover:bg-slate-200 transition-all text-lg"
-              >
-                稍後處理
-              </button>
+              <div className="flex flex-col gap-4">
+                <button
+                  onClick={() => handleConfirmRedemption(scanResult.id)}
+                  className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-black py-6 rounded-2xl transition-all shadow-2xl shadow-indigo-100 flex items-center justify-center gap-4 text-xl active:scale-95"
+                >
+                  <Check size={28} />
+                  確認發放獎勵
+                </button>
+                <button
+                  onClick={() => setScanResult(null)}
+                  className="w-full bg-slate-100 text-slate-600 font-bold py-5 rounded-2xl hover:bg-slate-200 transition-all text-lg"
+                >
+                  稍後處理
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
-    </div>
+        )
+      }
+    </div >
   );
 };
 
