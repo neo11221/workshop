@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Heart, Plus, Sparkles, Send, X, ThumbsUp } from 'lucide-react';
 import { UserProfile, Wish } from '../types';
-import { subscribeToWishes, addWish, likeWish, updateWish, saveStudent } from '../utils/storage';
+import { subscribeToWishes, addWish, likeWish, updateWish, saveUser } from '../utils/storage';
 import { useAlert } from './AlertProvider';
 import { Clock, Coins } from 'lucide-react';
 
@@ -88,16 +88,17 @@ const WishingWell: React.FC<WishingWellProps> = ({ user, onUserUpdate }) => {
     };
 
     const handleResetCooldown = async () => {
-        if (user.points < 1000) {
-            showAlert('點數不足！需要 1000 點才能重置冷卻喔。', 'error');
+        const RESET_COST = 500;
+        if (user.points < RESET_COST) {
+            showAlert(`點數不足！需要 ${RESET_COST} 點才能重置冷卻喔。`, 'error');
             return;
         }
 
-        if (confirm('確定要花費 1000 點重置冷卻時間嗎？')) {
+        if (confirm(`確定要花費 ${RESET_COST} 點重置冷卻時間嗎？`)) {
             try {
                 // 1. Deduct points
-                const updatedUser = { ...user, points: user.points - 1000 };
-                await saveStudent(updatedUser);
+                const updatedUser = { ...user, points: user.points - RESET_COST };
+                await saveUser(updatedUser);
 
                 // 2. Reset last wish timestamp (set to 31 days ago)
                 if (userLastWish) {
@@ -153,7 +154,7 @@ const WishingWell: React.FC<WishingWellProps> = ({ user, onUserUpdate }) => {
                                 className="mt-2 bg-amber-100 text-amber-700 px-3 py-1 rounded-full text-[10px] font-black flex items-center gap-1 hover:bg-amber-200 transition-colors shadow-sm"
                             >
                                 <Coins size={10} />
-                                1000 PTS 重置
+                                500 PTS 重置
                             </button>
                         </div>
                     )}
