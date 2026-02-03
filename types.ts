@@ -113,4 +113,7 @@ export interface Banner {
   link?: string;
   active: boolean;
   timestamp: number;
+  objectPosition?: string; // CSS object-position (e.g., 'center', 'top', '50% 20%')
+  mobileHeight?: string; // mobile height class (e.g., 'h-40')
+  desktopHeight?: string; // desktop height class (e.g., 'md:h-80')
 }

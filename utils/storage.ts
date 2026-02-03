@@ -10,6 +10,8 @@ import {
   updateDoc,
   writeBatch,
   Unsubscribe,
+  where,
+  limit,
 } from 'firebase/firestore';
 import { db } from './firebase';
 import { UserProfile, Redemption, UserRole, Product, Wish, Mission, ChallengeHistory, PointReason, MissionSubmission, ProductCategory, Banner } from '../types';
@@ -398,31 +400,66 @@ export const getChallengeHistory = async (): Promise<ChallengeHistory[]> => {
 
 export const addChallengeHistory = async (record: ChallengeHistory) => {
   try {
-    const docId = `${record.userId}_${record.missionId}_${Date.now()}`;
+    const docId = `h_${Date.now()}_${record.userId}`;
     await setDoc(doc(db, COLLECTIONS.CHALLENGE_HISTORY, docId), record);
   } catch (error) {
     console.error('Error adding challenge history:', error);
   }
 };
 
+/**
+ * [OPTIMIZED] 檢查特定任務今日是否已完成
+ * 僅抓取符合 userId, missionId 且時間為今日之後的紀錄，限制回傳 1 筆。
+ */
 export const hasCompletedMission = async (
   userId: string,
   missionId: string
 ): Promise<boolean> => {
   try {
-    const history = await getChallengeHistory();
-    // 判斷是否為「今日」完成
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    return history.some((h) =>
-      h.userId === userId &&
-      h.missionId === missionId &&
-      h.timestamp >= today.getTime()
+    const q = query(
+      collection(db, COLLECTIONS.CHALLENGE_HISTORY),
+      where('userId', '==', userId),
+      where('missionId', '==', missionId),
+      where('timestamp', '>=', today.getTime()),
+      limit(1)
     );
+
+    const querySnapshot = await getDocs(q);
+    return !querySnapshot.empty;
   } catch (error) {
     console.error('Error checking mission completion:', error);
     return false;
+  }
+};
+
+/**
+ * [OPTIMIZED] 一次獲取該學生今日所有已完成的任務 ID
+ * 避免在 Dashboard 循環呼叫 API。
+ */
+export const getTodayCompletedMissionIds = async (userId: string): Promise<Set<string>> => {
+  try {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const q = query(
+      collection(db, COLLECTIONS.CHALLENGE_HISTORY),
+      where('userId', '==', userId),
+      where('timestamp', '>=', today.getTime())
+    );
+
+    const querySnapshot = await getDocs(q);
+    const ids = new Set<string>();
+    querySnapshot.forEach(doc => {
+      const data = doc.data();
+      if (data.missionId) ids.add(data.missionId);
+    });
+    return ids;
+  } catch (error) {
+    console.error('Error fetching today completed missions:', error);
+    return new Set();
   }
 };
 
@@ -764,7 +801,13 @@ export const subscribeToRedemptions = (
 
 // --- Banners ---
 
-export const addBanner = async (imageUrl: string, tag: string = '精選推薦') => {
+export const addBanner = async (
+  imageUrl: string,
+  tag: string = '精選推薦',
+  objectPosition: string = 'center',
+  mobileHeight: string = 'h-48',
+  desktopHeight: string = 'md:h-72'
+) => {
   try {
     const newBanner: Banner = {
       id: `banner_${Date.now()}`,
@@ -772,6 +815,9 @@ export const addBanner = async (imageUrl: string, tag: string = '精選推薦') 
       tag,
       active: true,
       timestamp: Date.now(),
+      objectPosition,
+      mobileHeight,
+      desktopHeight,
     };
     await setDoc(doc(db, COLLECTIONS.BANNERS, newBanner.id), newBanner);
   } catch (error) {

@@ -4,7 +4,7 @@ import { Trophy, TrendingUp, Sparkles, CheckCircle, ChevronLeft, ChevronRight, M
 import { UserProfile, RankTitle, Mission, MissionSubmission } from '../types';
 import { RANKS } from '../constants';
 import { getEncouragement } from '../services/geminiService';
-import { subscribeToMissions, subscribeToMissionSubmissions, submitMission, hasCompletedMission, subscribeToBanners } from '../utils/storage';
+import { subscribeToMissions, subscribeToMissionSubmissions, submitMission, getTodayCompletedMissionIds, subscribeToBanners } from '../utils/storage';
 import { Banner } from '../types';
 import { useAlert } from './AlertProvider';
 
@@ -45,13 +45,9 @@ const Dashboard: React.FC<DashboardProps> = ({ user, rank, onUserUpdate }) => {
       const activeMissions = allMissions.filter(m => m.isActive);
       setMissions(activeMissions);
 
-      // Check completion status for all active missions from HISTORY
-      const statusSet = new Set<string>();
-      for (const m of activeMissions) {
-        const isCompleted = await hasCompletedMission(user.id, m.id);
-        if (isCompleted) statusSet.add(m.id);
-      }
-      setCompletedMissionIds(statusSet);
+      // [OPTIMIZED] 一次性獲取今日所有已完成任務 ID，避免循環呼叫 API
+      const completedIds = await getTodayCompletedMissionIds(user.id);
+      setCompletedMissionIds(completedIds);
     });
 
     const unsubscribeSubmissions = subscribeToMissionSubmissions((allSubmissions) => {
@@ -180,14 +176,19 @@ const Dashboard: React.FC<DashboardProps> = ({ user, rank, onUserUpdate }) => {
 
       {/* Banner Carousel */}
       {banners.length > 0 && (
-        <div className="relative w-full h-48 md:h-72 rounded-[3.5rem] overflow-hidden shadow-2xl shadow-indigo-100 group border-4 border-white">
+        <div className={`relative w-full ${banners[currentBannerIndex]?.mobileHeight || 'h-48'} ${banners[currentBannerIndex]?.desktopHeight || 'md:h-72'} rounded-[3.5rem] overflow-hidden shadow-2xl shadow-indigo-100 group border-4 border-white transition-all duration-500`}>
           <div
             className="flex transition-transform duration-700 ease-in-out h-full"
             style={{ transform: `translateX(-${currentBannerIndex * 100}%)` }}
           >
             {banners.map(banner => (
               <div key={banner.id} className="min-w-full h-full relative">
-                <img src={banner.imageUrl} alt="banner" className="w-full h-full object-cover" />
+                <img
+                  src={banner.imageUrl}
+                  alt="banner"
+                  className="w-full h-full object-cover"
+                  style={{ objectPosition: banner.objectPosition || 'center' }}
+                />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent flex items-end justify-start p-12">
                   <div className="mt-auto">
                     <span className="bg-indigo-600/90 backdrop-blur text-white px-4 py-2 rounded-xl text-xs font-black uppercase tracking-[0.2em] shadow-lg">

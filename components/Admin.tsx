@@ -64,6 +64,9 @@ const Admin: React.FC<AdminProps> = ({ onRefresh }) => {
   // 廣告橫幅管理
   const [newBannerImage, setNewBannerImage] = useState('');
   const [newBannerTag, setNewBannerTag] = useState('精選推薦');
+  const [newBannerPosition, setNewBannerPosition] = useState('center');
+  const [newBannerMobileHeight, setNewBannerMobileHeight] = useState('h-48');
+  const [newBannerDesktopHeight, setNewBannerDesktopHeight] = useState('md:h-72');
   const [isAddingBanner, setIsAddingBanner] = useState(false);
   const [bannerPreview, setBannerPreview] = useState<string | null>(null);
 
@@ -1170,12 +1173,67 @@ const Admin: React.FC<AdminProps> = ({ onRefresh }) => {
                     </div>
                   </div>
 
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full">
+                    <div className="space-y-2">
+                      <label className="block text-xs font-black text-slate-400 uppercase tracking-widest">展示範圍 (CSS Position)</label>
+                      <select
+                        value={newBannerPosition}
+                        onChange={(e) => setNewBannerPosition(e.target.value)}
+                        className="w-full p-4 rounded-2xl border-2 border-slate-100 font-bold text-slate-700 outline-none focus:border-indigo-500 transition-all shadow-sm"
+                      >
+                        <option value="center">置中 (Center)</option>
+                        <option value="top">偏上 (Top)</option>
+                        <option value="bottom">偏下 (Bottom)</option>
+                        <option value="left">偏左 (Left)</option>
+                        <option value="right">偏右 (Right)</option>
+                        <option value="50% 20%">自訂 (50% 20%)</option>
+                      </select>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="block text-xs font-black text-slate-400 uppercase tracking-widest">手機高度</label>
+                      <select
+                        value={newBannerMobileHeight}
+                        onChange={(e) => setNewBannerMobileHeight(e.target.value)}
+                        className="w-full p-4 rounded-2xl border-2 border-slate-100 font-bold text-slate-700 outline-none focus:border-indigo-500 transition-all shadow-sm"
+                      >
+                        <option value="h-32">極短 (h-32)</option>
+                        <option value="h-40">短 (h-40)</option>
+                        <option value="h-48">中等 (h-48)</option>
+                        <option value="h-56">長 (h-56)</option>
+                        <option value="h-64">極長 (h-64)</option>
+                      </select>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="block text-xs font-black text-slate-400 uppercase tracking-widest">電腦高度</label>
+                      <select
+                        value={newBannerDesktopHeight}
+                        onChange={(e) => setNewBannerDesktopHeight(e.target.value)}
+                        className="w-full p-4 rounded-2xl border-2 border-slate-100 font-bold text-slate-700 outline-none focus:border-indigo-500 transition-all shadow-sm"
+                      >
+                        <option value="md:h-48">短 (md:h-48)</option>
+                        <option value="md:h-64">中等 (md:h-64)</option>
+                        <option value="md:h-72">標準 (md:h-72)</option>
+                        <option value="md:h-80">長 (md:h-80)</option>
+                        <option value="md:h-96">極長 (md:h-96)</option>
+                      </select>
+                    </div>
+                  </div>
+
                   <button
                     onClick={async () => {
                       if (newBannerImage) {
-                        await addBanner(newBannerImage, newBannerTag);
+                        await addBanner(
+                          newBannerImage,
+                          newBannerTag,
+                          newBannerPosition,
+                          newBannerMobileHeight,
+                          newBannerDesktopHeight
+                        );
                         setNewBannerImage('');
                         setNewBannerTag('精選推薦');
+                        setNewBannerPosition('center');
+                        setNewBannerMobileHeight('h-48');
+                        setNewBannerDesktopHeight('md:h-72');
                         setBannerPreview(null);
                         setIsAddingBanner(false);
                         showAlert('廣告新增成功！', 'success');

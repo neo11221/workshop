@@ -92,14 +92,19 @@ const Shop: React.FC<ShopProps> = ({ user, onUserUpdate }) => {
 
       {/* Banner Carousel */}
       {banners.length > 0 && (
-        <div className="relative w-full h-48 md:h-64 rounded-[2.5rem] overflow-hidden shadow-2xl shadow-indigo-100 group">
+        <div className={`relative w-full ${banners[currentBannerIndex]?.mobileHeight || 'h-48'} ${banners[currentBannerIndex]?.desktopHeight || 'md:h-64'} rounded-[2.5rem] overflow-hidden shadow-2xl shadow-indigo-100 group transition-all duration-500`}>
           <div
             className="flex transition-transform duration-700 ease-in-out h-full"
             style={{ transform: `translateX(-${currentBannerIndex * 100}%)` }}
           >
             {banners.map(banner => (
               <div key={banner.id} className="min-w-full h-full relative">
-                <img src={banner.imageUrl} alt="banner" className="w-full h-full object-cover" />
+                <img
+                  src={banner.imageUrl}
+                  alt="banner"
+                  className="w-full h-full object-cover"
+                  style={{ objectPosition: banner.objectPosition || 'center' }}
+                />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent flex items-end p-8">
                   <div className="mt-auto">
                     <span className="bg-indigo-600/90 backdrop-blur text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] shadow-lg">
