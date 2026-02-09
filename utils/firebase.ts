@@ -13,8 +13,14 @@ const firebaseConfig = {
 };
 
 // 初始化 Firebase
-const app = initializeApp(firebaseConfig);
+let app;
+try {
+    app = initializeApp(firebaseConfig);
+} catch (e) {
+    console.error("Firebase init failed:", e);
+    app = { name: "[Placeholder]" } as any;
+}
 
 // 初始化 Firestore
-export const db = getFirestore(app);
-export const auth = getAuth(app);
+export const db = app.name !== "[Placeholder]" ? getFirestore(app) : null as any;
+export const auth = app.name !== "[Placeholder]" ? getAuth(app) : null as any;
