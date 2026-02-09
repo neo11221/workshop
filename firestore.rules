@@ -7,33 +7,78 @@ service cloud.firestore {
       return request.auth != null;
     }
     
-    // 檢查是否為「匿名登入」
-    function isAnonymous() {
-      return isAuthenticated() && request.auth.token.firebase.sign_in_provider == 'anonymous';
-    }
-
-    // 檢查是否為「郵件登入」(真正學生/老師)
+    // 檢查是否為「郵件登入」(排除匿名訪客)
     function isVerifiedUser() {
       return isAuthenticated() && request.auth.token.firebase.sign_in_provider != 'anonymous';
     }
 
-    // --- 學生名冊 ---
-    match /students/{studentId} {
-      // 1. 公開讀取：為了讓尚未登入的人能查是否有該學生
-      allow read: if true;
-      // 2. 註冊：允許還沒登入的人建立資料 (但建立後其實馬上就應該去 Firebase Auth 註冊)
-      allow create: if true;
-      // 3. 修改/刪除：絕對限制必需是「驗證過的用戶」(不能是匿名訪客)
-      allow update, delete: if isVerifiedUser();
+    // 檢查是否為管理員 (admin@workshop.local)
+    function isAdmin() {
+      return isVerifiedUser() && request.auth.token.email == 'admin@workshop.local';
     }
 
-    // --- 其他所有集合 (任務、商品、兌換紀錄等) ---
-    match /{document=**} {
-      // 讀取：允許所有登入者 (包含訪客)
+    // 檢查是否為檔案擁有者 (利用 Email 前綴與 Document ID 的對應關係)
+    // 學生 ID = 姓名，Email = 姓名@workshop.local
+    function isOwner(id) {
+      return isVerifiedUser() && request.auth.token.email == id + "@workshop.local";
+    }
+
+    // --- 1. 學生名冊 ---
+    match /students/{studentId} {
+      allow read, create: if true; // 註冊需要公開
+      allow update: if isAdmin() || isOwner(studentId);
+      allow delete: if isAdmin();
+    }
+
+    // --- 2. 任務與商品 (只有老師能改名單) ---
+    match /missions/{id} {
       allow read: if isAuthenticated();
-      // 寫入/修改/刪除：僅限「驗證過的用戶」(學生/老師)
-      // 這樣訪客就只能看，不能亂改資料
-      allow write: if isVerifiedUser();
+      allow write: if isAdmin();
+    }
+    match /products/{id} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+    match /productCategories/{id} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+    match /banners/{id} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    // --- 3. 任務繳交 (學生可繳交，老師可審核) ---
+    match /missionSubmissions/{id} {
+      allow read: if isAuthenticated();
+      // 學生可以預約/繳交自己的任務
+      allow create: if isVerifiedUser() && request.resource.data.userId == (request.auth.token.email.split("@")[0]);
+      // 只有老師可以更改狀態 (核准/拒絕)
+      allow update, delete: if isAdmin();
+    }
+
+    // --- 4. 關鍵紀錄 (只有老師能產生/修改) ---
+    match /challengeHistory/{id} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+    match /pointReasons/{id} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+    match /redemptions/{id} {
+      allow read: if isAuthenticated();
+      allow create: if isVerifiedUser(); // 學生可以發起兌換
+      allow update, delete: if isAdmin(); // 老師可以審核兌換
+    }
+
+    // --- 5. 許願池 (學生可許願、按讚) ---
+    match /wishes/{id} {
+      allow read: if isAuthenticated();
+      allow create: if isVerifiedUser();
+      // 允許多人更新 likedBy 陣列
+      allow update: if isAuthenticated(); 
+      allow delete: if isAdmin() || isOwner(resource.data.userId);
     }
   }
 }
