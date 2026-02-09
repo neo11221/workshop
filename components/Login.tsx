@@ -4,6 +4,8 @@ import { getStudents, registerStudent, ADMIN_USER, GUEST_USER, saveUser } from '
 import { Zap, ShieldCheck, User, UserPlus, Eye } from 'lucide-react';
 import { useAlert } from './AlertProvider';
 import { GRADES } from '../constants';
+import { auth } from '../utils/firebase';
+import { signInWithEmailAndPassword, signInAnonymously } from 'firebase/auth';
 
 interface LoginProps {
     onLogin: (user: UserProfile) => void;
@@ -23,34 +25,48 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
 
     const handleStudentLogin = async (e: React.FormEvent) => {
         e.preventDefault();
-        const students = await getStudents();
-        const user = students.find(s => s.name === name);
+        try {
+            // 1. 先獲取學生列表 (需要 Firestore 規則允許 public read)
+            const students = await getStudents();
+            const user = students.find(s => s.name === name);
 
-        if (!user) {
-            showAlert('找不到此用戶，請先註冊。', 'error');
-            return;
+            if (!user) {
+                showAlert('找不到此用戶，請先註冊。', 'error');
+                return;
+            }
+
+            if (!user.isApproved) {
+                showAlert('您的帳號尚在審核中，請待導師核准。', 'info');
+                return;
+            }
+
+            // 2. 嘗試 Firebase 登入
+            // Email 格式: [id]@workshop.local
+            const email = `${user.id}@workshop.local`;
+            await signInWithEmailAndPassword(auth, email, password);
+
+            // 3. 登入成功，儲存 session
+            await saveUser(user);
+            showAlert('登入成功！', 'success');
+            onLogin(user);
+
+        } catch (error: any) {
+            console.error('Login error:', error);
+            if (error.code === 'auth/invalid-credential' || error.code === 'auth/wrong-password') {
+                showAlert('密碼錯誤 (或是帳號尚未建立)。', 'error');
+            } else if (error.code === 'auth/user-not-found') {
+                showAlert('尚未建立登入帳號，請聯繫導師。', 'error');
+            } else {
+                showAlert(`登入失敗: ${error.message}`, 'error');
+            }
         }
-
-        if (user.password && user.password !== password) {
-            showAlert('密碼錯誤。', 'error');
-            return;
-        }
-
-        if (!user.isApproved) {
-            showAlert('您的帳號尚在審核中，請待導師核准。', 'info');
-            return;
-        }
-
-        await saveUser(user);
-        showAlert('登入成功！', 'success');
-        onLogin(user);
     };
 
     const handleRegister = async (e: React.FormEvent) => {
         e.preventDefault();
         const success = await registerStudent(name, password, grade);
         if (success) {
-            showAlert('註冊申請已送出！請通知導師審核。', 'success');
+            showAlert('註冊申請已送出！請通知導師審核並建立帳號。', 'success');
             setIsRegistering(false);
             setPassword('');
         } else {
@@ -58,23 +74,52 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
         }
     };
 
-    const handleAdminLogin = (e: React.FormEvent) => {
+    const handleAdminLogin = async (e: React.FormEvent) => {
         e.preventDefault();
+        // 原本: if (adminPass === '0957999')
         if (adminPass === '0957999') {
-            saveUser(ADMIN_USER);
-            showAlert('管理員登入成功！', 'success');
-            onLogin(ADMIN_USER);
+            // 為了相容舊習慣，如果輸入的是舊密碼 0957999，我們嘗試用預設管理員帳號登入
+            try {
+                await signInWithEmailAndPassword(auth, 'admin@workshop.local', '0957999');
+                saveUser(ADMIN_USER);
+                showAlert('管理員登入成功！', 'success');
+                onLogin(ADMIN_USER);
+            } catch (error: any) {
+                // 如果 admin@workshop.local 沒建立，就 fallback?
+                // 不，強迫要建立。
+                showAlert('管理員帳號尚未建立 (admin@workshop.local)', 'error');
+            }
         } else {
-            showAlert('管理員密碼錯誤', 'error');
+            // 也可以允許直接輸入 email? 不，介面只有 password。
+            // 假設管理員都用 admin@workshop.local
+            try {
+                // 嘗試把輸入當作密碼
+                await signInWithEmailAndPassword(auth, 'admin@workshop.local', adminPass);
+                saveUser(ADMIN_USER);
+                showAlert('管理員登入成功！', 'success');
+                onLogin(ADMIN_USER);
+            } catch (error) {
+                showAlert('管理員密碼錯誤', 'error');
+            }
         }
     };
 
-    const handleGuestLogin = (e: React.FormEvent) => {
+    const handleGuestLogin = async (e: React.FormEvent) => {
         e.preventDefault();
         if (guestCode.toLowerCase() === 'aaa') {
-            saveUser(GUEST_USER);
-            showAlert('訪客登入成功！', 'success');
-            onLogin(GUEST_USER);
+            try {
+                await signInAnonymously(auth);
+                saveUser(GUEST_USER);
+                showAlert('訪客登入成功！', 'success');
+                onLogin(GUEST_USER);
+            } catch (error: any) {
+                console.error('Guest login error:', error);
+                if (error.code === 'auth/admin-restricted-operation') {
+                    showAlert('訪客登入未啟用，請在 Console 開啟 Anonymous。', 'error');
+                } else {
+                    showAlert('訪客登入失敗', 'error');
+                }
+            }
         } else {
             showAlert('訪客代碼錯誤', 'error');
         }

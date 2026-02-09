@@ -1,0 +1,39 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // --- 輔助函數 ---
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // 檢查是否為「匿名登入」
+    function isAnonymous() {
+      return isAuthenticated() && request.auth.token.firebase.sign_in_provider == 'anonymous';
+    }
+
+    // 檢查是否為「郵件登入」(真正學生/老師)
+    function isVerifiedUser() {
+      return isAuthenticated() && request.auth.token.firebase.sign_in_provider != 'anonymous';
+    }
+
+    // --- 學生名冊 ---
+    match /students/{studentId} {
+      // 1. 公開讀取：為了讓尚未登入的人能查是否有該學生
+      allow read: if true;
+      // 2. 註冊：允許還沒登入的人建立資料 (但建立後其實馬上就應該去 Firebase Auth 註冊)
+      allow create: if true;
+      // 3. 修改/刪除：絕對限制必需是「驗證過的用戶」(不能是匿名訪客)
+      allow update, delete: if isVerifiedUser();
+    }
+
+    // --- 其他所有集合 (任務、商品、兌換紀錄等) ---
+    match /{document=**} {
+      // 讀取：允許所有登入者 (包含訪客)
+      allow read: if isAuthenticated();
+      // 寫入/修改/刪除：僅限「驗證過的用戶」(學生/老師)
+      // 這樣訪客就只能看，不能亂改資料
+      allow write: if isVerifiedUser();
+    }
+  }
+}

@@ -194,8 +194,11 @@ export const saveUser = async (user: UserProfile) => {
   }
 };
 
-export const logoutUser = () => {
+import { auth } from './firebase';
+
+export const logoutUser = async () => {
   localStorage.removeItem(STORAGE_KEYS.USER);
+  await auth.signOut();
 };
 
 // --- Redemptions Management ---
