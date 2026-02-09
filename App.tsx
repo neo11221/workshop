@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { HashRouter, Routes, Route, Link, useLocation } from 'react-router-dom';
+import { HashRouter, Routes, Route, Link, useLocation, Navigate } from 'react-router-dom';
 import {
   LayoutDashboard,
   ShoppingBag,
@@ -140,7 +140,7 @@ const App: React.FC = () => {
                   <Route path="/shop" element={<Shop user={user} onUserUpdate={refreshUser} />} />
                   <Route path="/wishes" element={<WishingWell user={user} onUserUpdate={refreshUser} />} />
                   <Route path="/history" element={<Redemptions user={user} />} />
-                  <Route path="/admin" element={<Admin onRefresh={refreshUser} />} />
+                  <Route path="/admin" element={user.role === UserRole.ADMIN ? <Admin onRefresh={refreshUser} /> : <Navigate to="/" replace />} />
                   <Route path="/settings" element={<Settings user={user} onUserUpdate={refreshUser} />} />
                 </Routes>
               </div>
