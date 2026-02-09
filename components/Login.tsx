@@ -5,7 +5,7 @@ import { Zap, ShieldCheck, User, UserPlus, Eye } from 'lucide-react';
 import { useAlert } from './AlertProvider';
 import { GRADES } from '../constants';
 import { auth } from '../utils/firebase';
-import { signInWithEmailAndPassword, signInAnonymously, createUserWithEmailAndPassword } from 'firebase/auth';
+import { signInWithEmailAndPassword, signInAnonymously, createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 
 interface LoginProps {
     onLogin: (user: UserProfile) => void;
@@ -73,13 +73,15 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                 return;
             }
 
-            // 2. 準備新用戶資料
-            const newId = `user_${Date.now()}`;
+            // 2. 準備新用戶資料 (直接用姓名作為 ID，方便管理員在後台搜尋)
+            const newId = name;
             const email = `${newId}@workshop.local`;
 
             // 3. 建立 Firebase Auth 帳號
-            // 這一步如果成功，就會自動登入 (Auth state changed)
-            await createUserWithEmailAndPassword(auth, email, password);
+            const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+
+            // 設定顯示名稱，讓 Auth 列表更好看
+            await updateProfile(userCredential.user, { displayName: name });
 
             // 4. 建立 Firestore 資料
             const newUser: UserProfile = {
