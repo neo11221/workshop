@@ -117,10 +117,10 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
     const handleAdminLogin = async (e: React.FormEvent) => {
         e.preventDefault();
         // 原本: if (adminPass === '0957999')
-        if (adminPass === '0957999') {
-            // 為了相容舊習慣，如果輸入的是舊密碼 0957999，我們嘗試用預設管理員帳號登入
+        if (adminPass === '0857999') {
+            // 為了相容舊習慣，如果輸入的是舊密碼 0857999，我們嘗試用預設管理員帳號登入
             try {
-                await signInWithEmailAndPassword(auth, 'admin@workshop.local', '0957999');
+                await signInWithEmailAndPassword(auth, 'admin@workshop.local', '0857999');
                 saveUser(ADMIN_USER);
                 showAlert('管理員登入成功！', 'success');
                 onLogin(ADMIN_USER);
