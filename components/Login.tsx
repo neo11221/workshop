@@ -5,7 +5,7 @@ import { Zap, ShieldCheck, User, UserPlus, Eye } from 'lucide-react';
 import { useAlert } from './AlertProvider';
 import { GRADES } from '../constants';
 import { auth } from '../utils/firebase';
-import { signInWithEmailAndPassword, signInAnonymously } from 'firebase/auth';
+import { signInWithEmailAndPassword, signInAnonymously, createUserWithEmailAndPassword } from 'firebase/auth';
 
 interface LoginProps {
     onLogin: (user: UserProfile) => void;
@@ -64,13 +64,53 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
 
     const handleRegister = async (e: React.FormEvent) => {
         e.preventDefault();
-        const success = await registerStudent(name, password, grade);
-        if (success) {
-            showAlert('註冊申請已送出！請通知導師審核並建立帳號。', 'success');
+
+        try {
+            // 1. 先確認名稱是否重複
+            const students = await getStudents();
+            if (students.some((s) => s.name === name)) {
+                showAlert('該名稱已被使用。', 'error');
+                return;
+            }
+
+            // 2. 準備新用戶資料
+            const newId = `user_${Date.now()}`;
+            const email = `${newId}@workshop.local`;
+
+            // 3. 建立 Firebase Auth 帳號
+            // 這一步如果成功，就會自動登入 (Auth state changed)
+            await createUserWithEmailAndPassword(auth, email, password);
+
+            // 4. 建立 Firestore 資料
+            const newUser: UserProfile = {
+                id: newId,
+                name,
+                password,
+                grade,
+                points: 0,
+                totalEarned: 0,
+                role: UserRole.STUDENT,
+                avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${name}&mouth=smile&eyebrows=defaultNatural&eyes=default`,
+                isApproved: false, // 預設未核准
+            };
+
+            // 寫入 Firestore
+            await saveUser(newUser);
+
+            // 5. 手動登出，讓流程回到登入頁面
+            await auth.signOut();
+
+            showAlert('註冊成功！帳號已自動建立，請通知導師核准您的檔案。', 'success');
             setIsRegistering(false);
             setPassword('');
-        } else {
-            showAlert('該名稱已被使用。', 'error');
+
+        } catch (error: any) {
+            console.error('Registration error:', error);
+            if (error.code === 'auth/email-already-in-use') {
+                showAlert('該帳號已存在 (Email 重複)。', 'error');
+            } else {
+                showAlert(`註冊失敗: ${error.message}`, 'error');
+            }
         }
     };
 
