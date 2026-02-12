@@ -12,6 +12,7 @@ import {
   Unsubscribe,
   where,
   limit,
+  runTransaction,
 } from 'firebase/firestore';
 import { db } from './firebase';
 import { UserProfile, Redemption, UserRole, Product, Wish, Mission, ChallengeHistory, PointReason, MissionSubmission, ProductCategory, Banner } from '../types';
@@ -174,6 +175,71 @@ export const getRedemptions = async (): Promise<Redemption[]> => {
   } catch (error) {
     console.error('Error fetching redemptions:', error);
     return [];
+  }
+};
+
+/**
+ * [ATOMIC] 兌換商品
+ * 1. 檢查餘額
+ * 2. 檢查庫存
+ * 3. 扣點
+ * 4. 扣庫存
+ * 5. 紀錄兌換
+ */
+export const redeemProduct = async (user: UserProfile, product: Product): Promise<{ success: boolean; message: string }> => {
+  try {
+    const result = await runTransaction(db, async (transaction) => {
+      const studentDocRef = doc(db, COLLECTIONS.STUDENTS, user.id);
+      const productDocRef = doc(db, COLLECTIONS.PRODUCTS, product.id);
+      const redemptionDocRef = doc(db, COLLECTIONS.REDEMPTIONS, `red_${Date.now()}`);
+
+      const studentSnap = await transaction.get(studentDocRef);
+      const productSnap = await transaction.get(productDocRef);
+
+      if (!studentSnap.exists()) throw new Error('學生資料不存在');
+      if (!productSnap.exists()) throw new Error('商品不存在');
+
+      const studentData = studentSnap.data() as UserProfile;
+      const productData = productSnap.data() as Product;
+
+      if (studentData.points < productData.price) {
+        return { success: false, message: '點數餘額不足' };
+      }
+
+      if (productData.stock <= 0) {
+        return { success: false, message: '商品庫存不足' };
+      }
+
+      // 1. 扣除學生點數
+      transaction.update(studentDocRef, {
+        points: studentData.points - productData.price
+      });
+
+      // 2. 扣除庫存
+      transaction.update(productDocRef, {
+        stock: productData.stock - 1
+      });
+
+      // 3. 建立兌換紀錄
+      const redemption: Redemption = {
+        id: redemptionDocRef.id,
+        userId: user.id,
+        productId: product.id,
+        productName: product.name,
+        pointsSpent: product.price,
+        timestamp: Date.now(),
+        status: 'pending',
+        qrCodeData: `AUTH_WORKSHOP_${Date.now()}_${product.id}`
+      };
+      transaction.set(redemptionDocRef, redemption);
+
+      return { success: true, message: '兌換成功' };
+    });
+
+    return result;
+  } catch (error: any) {
+    console.error('Redemption transaction failed:', error);
+    return { success: false, message: `兌換失敗: ${error.message}` };
   }
 };
 
@@ -389,35 +455,42 @@ export const submitMission = async (submission: MissionSubmission) => {
 
 export const approveMission = async (submissionId: string) => {
   try {
-    const docRef = doc(db, COLLECTIONS.MISSION_SUBMISSIONS, submissionId);
-    const docSnap = await getDoc(docRef);
-    if (docSnap.exists()) {
-      const submission = docSnap.data() as MissionSubmission;
+    await runTransaction(db, async (transaction) => {
+      const submissionRef = doc(db, COLLECTIONS.MISSION_SUBMISSIONS, submissionId);
+      const submissionSnap = await transaction.get(submissionRef);
 
-      // 1. Update submission status
-      await updateDoc(docRef, { status: 'approved' });
+      if (!submissionSnap.exists()) throw new Error('申請紀錄不存在');
+      const submission = submissionSnap.data() as MissionSubmission;
 
-      // 2. Add to challenge history
-      await addChallengeHistory({
-        id: `h_${Date.now()}`,
+      if (submission.status !== 'pending') throw new Error('此申請已被處理過');
+
+      // 1. 更新狀態
+      transaction.update(submissionRef, { status: 'approved' });
+
+      // 2. 新增挑戰紀錄
+      const historyId = `h_${Date.now()}`;
+      const historyRef = doc(db, COLLECTIONS.CHALLENGE_HISTORY, historyId);
+      transaction.set(historyRef, {
+        id: historyId,
         userId: submission.userId,
         missionId: submission.missionId,
         timestamp: Date.now()
       });
 
-      // 3. Award points to student
-      const studentDoc = doc(db, COLLECTIONS.STUDENTS, submission.userId);
-      const studentSnap = await getDoc(studentDoc);
+      // 3. 獎勵點數
+      const studentRef = doc(db, COLLECTIONS.STUDENTS, submission.userId);
+      const studentSnap = await transaction.get(studentRef);
       if (studentSnap.exists()) {
         const student = studentSnap.data() as UserProfile;
-        await updateDoc(studentDoc, {
+        transaction.update(studentRef, {
           points: student.points + submission.points,
           totalEarned: student.totalEarned + submission.points
         });
       }
-    }
+    });
   } catch (error) {
-    console.error('Error approving mission:', error);
+    console.error('Error approving mission (Transaction):', error);
+    throw error;
   }
 };
 

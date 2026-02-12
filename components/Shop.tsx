@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ShoppingCart, AlertCircle, Check, ChevronLeft, ChevronRight, X, Tag, Package } from 'lucide-react';
 import { Product, UserProfile, Redemption, ProductCategory, Banner } from '../types';
-import { saveUser, addRedemption, updateProductStock, subscribeToProducts, subscribeToProductCategories, subscribeToBanners } from '../utils/storage';
+import { saveUser, addRedemption, updateProductStock, subscribeToProducts, subscribeToProductCategories, subscribeToBanners, redeemProduct } from '../utils/storage';
 import { useAlert } from './AlertProvider';
 
 interface ShopProps {
@@ -56,31 +56,22 @@ const Shop: React.FC<ShopProps> = ({ user, onUserUpdate }) => {
     }
     if (!selectedProduct || user.points < selectedProduct.price || selectedProduct.stock <= 0) return;
 
-    const newRedemption: Redemption = {
-      id: `red_${Date.now()}`,
-      userId: user.id,
-      productId: selectedProduct.id,
-      productName: selectedProduct.name,
-      pointsSpent: selectedProduct.price,
-      timestamp: Date.now(),
-      status: 'pending',
-      qrCodeData: `AUTH_WORKSHOP_${Date.now()}_${selectedProduct.id}`
-    };
+    // --- 使用原子化交易進行兌換 ---
+    const result = await redeemProduct(user, selectedProduct);
 
-    const updatedUser = {
-      ...user,
-      points: user.points - selectedProduct.price
-    };
-
-    // Update storage (async)
-    await addRedemption(newRedemption);
-    await saveUser(updatedUser);
-    await updateProductStock(selectedProduct.id, 1);
-
-    // Refresh
-    onUserUpdate();
-    setSelectedProduct(null);
-    showAlert('🎉 兌換成功！請前往兌換紀錄查看 QR Code。', 'success');
+    if (result.success) {
+      // Refresh local state/session
+      const updatedUser = {
+        ...user,
+        points: user.points - selectedProduct.price
+      };
+      await saveUser(updatedUser);
+      onUserUpdate();
+      setSelectedProduct(null);
+      showAlert(`🎉 ${result.message}！請前往兌換紀錄查看 QR Code。`, 'success');
+    } else {
+      showAlert(result.message, 'error');
+    }
   };
 
   return (

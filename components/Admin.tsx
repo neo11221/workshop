@@ -396,8 +396,12 @@ const Admin: React.FC<AdminProps> = ({ onRefresh }) => {
   };
 
   const handleApproveMission = async (id: string) => {
-    await approveMission(id);
-    showAlert('已核准任務，點數已發放！', 'success');
+    try {
+      await approveMission(id);
+      showAlert('已核准任務，點數已發放！', 'success');
+    } catch (error: any) {
+      showAlert(`核准失敗: ${error.message || '未知錯誤'}`, 'error');
+    }
   };
 
   const handleRejectMission = async (id: string) => {
