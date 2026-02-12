@@ -127,21 +127,18 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                 showAlert('管理員登入成功！', 'success');
                 onLogin(ADMIN_USER);
             } catch (error: any) {
-                // 如果 admin@workshop.local 沒建立，就 fallback?
-                // 不，強迫要建立。
-                showAlert('管理員帳號尚未建立 (admin@workshop.local)', 'error');
+                console.error('Admin login error:', error);
+                showAlert(`管理員登入失敗: ${error.code || error.message}`, 'error');
             }
         } else {
-            // 也可以允許直接輸入 email? 不，介面只有 password。
-            // 假設管理員都用 admin@workshop.local
             try {
-                // 嘗試把輸入當作密碼
                 await signInWithEmailAndPassword(auth, 'admin@workshop.local', adminPass);
                 saveUser(ADMIN_USER);
                 showAlert('管理員登入成功！', 'success');
                 onLogin(ADMIN_USER);
-            } catch (error) {
-                showAlert('管理員密碼錯誤', 'error');
+            } catch (error: any) {
+                console.error('Admin login error:', error);
+                showAlert(`管理員密碼錯誤或登入失敗: ${error.code || error.message}`, 'error');
             }
         }
     };
