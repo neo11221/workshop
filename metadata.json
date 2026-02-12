@@ -3,5 +3,6 @@
   "description": "一個專為學習者設計的點數獎勵系統。透過完成任務累積點數，兌換各式實體商品或電子卷。包含成就稱號系統與 QR Code 兌換機制，適合教室、工作室或學習社群使用。",
   "requestFramePermissions": [
     "camera"
-  ]
+  ],
+  "last_updated": "2026-02-12"
 }
