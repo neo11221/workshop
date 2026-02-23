@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Camera, ShieldCheck, Check, Search, X, ScanLine, Gift, History as HistoryIcon, GraduationCap, Users, UserPlus, Package, Plus, Target, Clock, Trash2, Heart, CheckCircle, Image as ImageIcon } from 'lucide-react';
 import { Html5Qrcode } from 'html5-qrcode';
 import { Redemption, UserProfile, Product, UserRole, Mission, PointReason, Wish, MissionSubmission, ProductCategory, Banner } from '../types';
-import { updateRedemptionStatus, approveStudent, deleteStudent, addProduct, addMission, toggleMission, saveStudents, subscribeToStudents, subscribeToRedemptions, subscribeToProducts, subscribeToMissions, deleteProduct, addPointReason, deletePointReason, subscribeToPointReasons, subscribeToWishes, deleteWish, subscribeToMissionSubmissions, approveMission, rejectMission, updateProductStock, subscribeToProductCategories, addProductCategory, deleteProductCategory, saveStudent, addBanner, deleteBanner, subscribeToBanners } from '../utils/storage';
+import { updateRedemptionStatus, approveStudent, deleteStudent, addProduct, addMission, toggleMission, saveStudents, subscribeToStudents, subscribeToRedemptions, subscribeToProducts, subscribeToMissions, deleteProduct, addPointReason, deletePointReason, subscribeToPointReasons, subscribeToWishes, deleteWish, subscribeToMissionSubmissions, approveMission, rejectMission, updateProductStock, subscribeToProductCategories, addProductCategory, deleteProductCategory, saveStudent, addBanner, deleteBanner, subscribeToBanners, issuePointsAtomic } from '../utils/storage';
 import { useAlert } from './AlertProvider';
 import { Upload } from 'lucide-react';
 import { RANKS, GRADES } from '../constants';
@@ -198,34 +198,15 @@ const Admin: React.FC<AdminProps> = ({ onRefresh }) => {
     const amount = parseInt(pointAmount);
     if (isNaN(amount) || !targetStudentId) return;
 
-    const targetStudent = students.find(s => s.id === targetStudentId);
-    if (!targetStudent) {
-      showAlert('找不到目標學生', 'error');
-      return;
+    try {
+      await issuePointsAtomic(targetStudentId, amount);
+      setPointAmount('');
+      const targetStudent = students.find(s => s.id === targetStudentId);
+      showAlert(`發送成功！已給予 ${targetStudent?.name || ''} ${amount} 點。`, 'success');
+      onRefresh();
+    } catch (error: any) {
+      showAlert(`發放失敗: ${error.message}`, 'error');
     }
-
-    const pts = parseInt(pointAmount);
-    if (isNaN(pts) || pts <= 0) {
-      showAlert('點數必須是正整數', 'error');
-      return;
-    }
-
-    const updatedStudents = students.map(s => {
-      if (s.id === targetStudentId) {
-        return {
-          ...s,
-          points: s.points + amount,
-          totalEarned: amount > 0 ? s.totalEarned + amount : s.totalEarned
-        };
-      }
-      return s;
-    });
-
-    await saveStudents(updatedStudents);
-    onRefresh();
-    setStudents(prev => prev.map(s => s.id === targetStudentId ? { ...s, points: s.points + pts } : s));
-    setPointAmount('');
-    showAlert(`發送成功！已給予 ${targetStudent.name} ${pts} 點。`, 'success');
   };
 
   const handleFileToBase64 = (file: File): Promise<string> => {
@@ -363,8 +344,13 @@ const Admin: React.FC<AdminProps> = ({ onRefresh }) => {
   };
 
   const handleDeleteWish = async (id: string) => {
-    if (window.confirm('確定要執行備份嗎？（此操作僅為示意）')) {
-      showAlert('雲端備份已完成', 'success');
+    if (window.confirm('確定要刪除這個願望嗎？')) {
+      try {
+        await deleteWish(id);
+        showAlert('願望已刪除', 'success');
+      } catch (error: any) {
+        showAlert(`刪除失敗: ${error.message}`, 'error');
+      }
     }
   };
 

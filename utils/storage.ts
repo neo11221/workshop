@@ -123,6 +123,26 @@ export const approveStudent = async (id: string) => {
   }
 };
 
+export const issuePointsAtomic = async (studentId: string, amount: number) => {
+  try {
+    await runTransaction(db, async (transaction) => {
+      const studentRef = doc(db, COLLECTIONS.STUDENTS, studentId);
+      const studentSnap = await transaction.get(studentRef);
+
+      if (!studentSnap.exists()) throw new Error('學生不存在');
+      const student = studentSnap.data() as UserProfile;
+
+      transaction.update(studentRef, {
+        points: student.points + amount,
+        totalEarned: amount > 0 ? student.totalEarned + amount : student.totalEarned
+      });
+    });
+  } catch (error) {
+    console.error('Error issuing points (Transaction):', error);
+    throw error;
+  }
+};
+
 export const deleteStudent = async (id: string) => {
   try {
     await deleteDoc(doc(db, COLLECTIONS.STUDENTS, id));
