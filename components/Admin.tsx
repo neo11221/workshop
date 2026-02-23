@@ -16,6 +16,7 @@ const Admin: React.FC<AdminProps> = ({ onRefresh }) => {
   const { showAlert } = useAlert();
   const [activeTab, setActiveTab] = useState<'roster' | 'scan' | 'points' | 'history' | 'approval' | 'products' | 'missions' | 'wishes' | 'mission_approval' | 'banners'>('roster');
   const [isScanning, setIsScanning] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
   const [redemptions, setRedemptions] = useState<Redemption[]>([]);
   const [students, setStudents] = useState<UserProfile[]>([]);
   const [pendingStudents, setPendingStudents] = useState<UserProfile[]>([]);
@@ -195,17 +196,24 @@ const Admin: React.FC<AdminProps> = ({ onRefresh }) => {
   };
 
   const handleIssuePoints = async () => {
+    if (isProcessing) return;
     const amount = parseInt(pointAmount);
     if (isNaN(amount) || !targetStudentId) return;
 
+    setIsProcessing(true);
     try {
+      console.log(`[Points] Issuing ${amount} to ${targetStudentId}...`);
       await issuePointsAtomic(targetStudentId, amount);
       setPointAmount('');
       const targetStudent = students.find(s => s.id === targetStudentId);
       showAlert(`發送成功！已給予 ${targetStudent?.name || ''} ${amount} 點。`, 'success');
-      onRefresh();
+      // onRefresh() is redundant here as the real-time listener will update the list
+      // and points issuance doesn't affect the admin's own profile.
     } catch (error: any) {
+      console.error('[Points] Error:', error);
       showAlert(`發放失敗: ${error.message}`, 'error');
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -725,10 +733,23 @@ const Admin: React.FC<AdminProps> = ({ onRefresh }) => {
 
             <button
               onClick={handleIssuePoints}
-              className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black py-8 rounded-[2rem] transition-all shadow-2xl shadow-emerald-200 flex items-center justify-center gap-4 text-2xl active:scale-95 group"
+              disabled={isProcessing || !targetStudentId || !pointAmount}
+              className={`w-full text-white font-black py-8 rounded-[2rem] transition-all shadow-2xl flex items-center justify-center gap-4 text-2xl active:scale-95 group ${isProcessing || !targetStudentId || !pointAmount
+                  ? 'bg-slate-300 shadow-none cursor-not-allowed'
+                  : 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-200'
+                }`}
             >
-              <Check size={32} className="group-hover:scale-125 transition-transform" />
-              確認核發獎勵
+              {isProcessing ? (
+                <>
+                  <Clock size={32} className="animate-spin" />
+                  發放中，請稍候...
+                </>
+              ) : (
+                <>
+                  <Check size={32} className="group-hover:scale-125 transition-transform" />
+                  確認核發獎勵
+                </>
+              )}
             </button>
           </div>
         </div>
