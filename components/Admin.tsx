@@ -1,9 +1,9 @@
 
 import React, { useState, useEffect } from 'react';
-import { Camera, ShieldCheck, Check, Search, X, ScanLine, Gift, History as HistoryIcon, GraduationCap, Users, UserPlus, Package, Plus, Target, Clock, Trash2, Heart, CheckCircle, Image as ImageIcon } from 'lucide-react';
+import { Camera, ShieldCheck, Check, Search, X, ScanLine, Gift, History as HistoryIcon, GraduationCap, Users, UserPlus, Package, Plus, Target, Clock, Trash2, Heart, CheckCircle, Image as ImageIcon, GripVertical, Monitor, Smartphone } from 'lucide-react';
 import { Html5Qrcode } from 'html5-qrcode';
 import { Redemption, UserProfile, Product, UserRole, Mission, PointReason, Wish, MissionSubmission, ProductCategory, Banner } from '../types';
-import { updateRedemptionStatus, approveStudent, deleteStudent, addProduct, addMission, toggleMission, saveStudents, subscribeToStudents, subscribeToRedemptions, subscribeToProducts, subscribeToMissions, deleteProduct, addPointReason, deletePointReason, subscribeToPointReasons, subscribeToWishes, deleteWish, subscribeToMissionSubmissions, approveMission, rejectMission, updateProductStock, subscribeToProductCategories, addProductCategory, deleteProductCategory, saveStudent, addBanner, deleteBanner, subscribeToBanners, issuePointsAtomic } from '../utils/storage';
+import { updateRedemptionStatus, approveStudent, deleteStudent, addProduct, addMission, toggleMission, saveStudents, subscribeToStudents, subscribeToRedemptions, subscribeToProducts, subscribeToMissions, deleteProduct, addPointReason, deletePointReason, subscribeToPointReasons, subscribeToWishes, deleteWish, subscribeToMissionSubmissions, approveMission, rejectMission, updateProductStock, subscribeToProductCategories, addProductCategory, deleteProductCategory, saveStudent, addBanner, deleteBanner, subscribeToBanners, issuePointsAtomic, updateBannersOrder } from '../utils/storage';
 import { useAlert } from './AlertProvider';
 import { Upload } from 'lucide-react';
 import { RANKS, GRADES } from '../constants';
@@ -30,6 +30,9 @@ const Admin: React.FC<AdminProps> = ({ onRefresh }) => {
   const [gradeFilter, setGradeFilter] = useState('全部');
   const [categories, setCategories] = useState<ProductCategory[]>([]);
   const [banners, setBanners] = useState<Banner[]>([]);
+  const [localBanners, setLocalBanners] = useState<Banner[]>([]);
+  const [dragBannerIdx, setDragBannerIdx] = useState<number | null>(null);
+  const [bannerPreviewMode, setBannerPreviewMode] = useState<'desktop' | 'mobile'>('desktop');
   const [scanInput, setScanInput] = useState('');
   const [scanResult, setScanResult] = useState<Redemption | null>(null);
   const redemptionsRef = React.useRef(redemptions);
@@ -101,7 +104,7 @@ const Admin: React.FC<AdminProps> = ({ onRefresh }) => {
       }
     });
 
-    const unsubBanners = subscribeToBanners(setBanners);
+    const unsubBanners = subscribeToBanners((b) => { setBanners(b); setLocalBanners(b); });
 
     return () => {
       unsubStudents();
@@ -1146,130 +1149,64 @@ const Admin: React.FC<AdminProps> = ({ onRefresh }) => {
                 <ImageIcon className="text-indigo-600" /> 廣告牆管理
               </h2>
               <button
-                onClick={() => setIsAddingBanner(!isAddingBanner)}
+                onClick={() => setIsAddingBanner(true)}
                 className="bg-indigo-600 text-white px-5 py-3 rounded-xl font-bold flex items-center gap-2 hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100"
               >
                 <Plus size={20} /> 新增廣告
               </button>
             </div>
 
-            {isAddingBanner && (
-              <div className="bg-slate-50 p-6 rounded-2xl mb-8 border border-slate-200 animate-in fade-in">
-                <h3 className="font-black text-slate-700 mb-4">上傳廣告圖片與設定標籤</h3>
-                <div className="flex flex-col gap-4">
-                  <div className="flex flex-col md:flex-row gap-4 items-start">
-                    <label className="flex-1 w-full flex items-center justify-center gap-2 p-10 rounded-[2rem] border-2 border-dashed border-slate-300 hover:border-indigo-400 hover:bg-indigo-50 transition-all cursor-pointer font-bold text-slate-500 hover:text-indigo-600">
-                      <Upload size={24} />
-                      {newBannerImage ? '已選好精美圖片' : '選擇廣告圖片檔案 (500KB內)'}
-                      <input type="file" className="hidden" accept="image/*" onChange={handleBannerImageSelect} />
-                    </label>
-
-                    <div className="w-full md:w-64 space-y-4">
-                      <label className="block text-xs font-black text-slate-400 uppercase tracking-widest">廣告標籤 (可自訂內容)</label>
-                      <input
-                        list="banner-tags"
-                        value={newBannerTag}
-                        onChange={(e) => setNewBannerTag(e.target.value)}
-                        placeholder="輸入或選擇標籤..."
-                        className="w-full p-4 rounded-2xl border-2 border-slate-100 font-bold text-slate-700 outline-none focus:border-indigo-500 transition-all shadow-sm"
-                      />
-                      <datalist id="banner-tags">
-                        <option value="精選推薦" />
-                        <option value="新品上架" />
-                        <option value="特價出清" />
-                        <option value="限時活動" />
-                        <option value="最新公告" />
-                      </datalist>
-                      {bannerPreview && <img src={bannerPreview} className="h-32 w-full object-cover rounded-2xl border border-white shadow-lg" alt="preview" />}
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full">
-                    <div className="space-y-2">
-                      <label className="block text-xs font-black text-slate-400 uppercase tracking-widest">展示範圍 (CSS Position)</label>
-                      <select
-                        value={newBannerPosition}
-                        onChange={(e) => setNewBannerPosition(e.target.value)}
-                        className="w-full p-4 rounded-2xl border-2 border-slate-100 font-bold text-slate-700 outline-none focus:border-indigo-500 transition-all shadow-sm"
-                      >
-                        <option value="center">置中 (Center)</option>
-                        <option value="top">偏上 (Top)</option>
-                        <option value="bottom">偏下 (Bottom)</option>
-                        <option value="left">偏左 (Left)</option>
-                        <option value="right">偏右 (Right)</option>
-                        <option value="50% 20%">自訂 (50% 20%)</option>
-                      </select>
-                    </div>
-                    <div className="space-y-2">
-                      <label className="block text-xs font-black text-slate-400 uppercase tracking-widest">手機高度</label>
-                      <select
-                        value={newBannerMobileHeight}
-                        onChange={(e) => setNewBannerMobileHeight(e.target.value)}
-                        className="w-full p-4 rounded-2xl border-2 border-slate-100 font-bold text-slate-700 outline-none focus:border-indigo-500 transition-all shadow-sm"
-                      >
-                        <option value="h-32">極短 (h-32)</option>
-                        <option value="h-40">短 (h-40)</option>
-                        <option value="h-48">中等 (h-48)</option>
-                        <option value="h-56">長 (h-56)</option>
-                        <option value="h-64">極長 (h-64)</option>
-                      </select>
-                    </div>
-                    <div className="space-y-2">
-                      <label className="block text-xs font-black text-slate-400 uppercase tracking-widest">電腦高度</label>
-                      <select
-                        value={newBannerDesktopHeight}
-                        onChange={(e) => setNewBannerDesktopHeight(e.target.value)}
-                        className="w-full p-4 rounded-2xl border-2 border-slate-100 font-bold text-slate-700 outline-none focus:border-indigo-500 transition-all shadow-sm"
-                      >
-                        <option value="md:h-48">短 (md:h-48)</option>
-                        <option value="md:h-64">中等 (md:h-64)</option>
-                        <option value="md:h-72">標準 (md:h-72)</option>
-                        <option value="md:h-80">長 (md:h-80)</option>
-                        <option value="md:h-96">極長 (md:h-96)</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  <button
-                    onClick={async () => {
-                      if (newBannerImage) {
-                        await addBanner(
-                          newBannerImage,
-                          newBannerTag,
-                          newBannerPosition,
-                          newBannerMobileHeight,
-                          newBannerDesktopHeight
-                        );
-                        setNewBannerImage('');
-                        setNewBannerTag('精選推薦');
-                        setNewBannerPosition('center');
-                        setNewBannerMobileHeight('h-48');
-                        setNewBannerDesktopHeight('md:h-72');
-                        setBannerPreview(null);
-                        setIsAddingBanner(false);
-                        showAlert('廣告新增成功！', 'success');
-                      } else {
-                        showAlert('請先選擇圖片檔案喔', 'error');
-                      }
-                    }}
-                    className="bg-emerald-600 text-white px-6 py-4 rounded-2xl font-black text-lg hover:bg-emerald-700 shadow-xl shadow-emerald-100 active:scale-95"
-                  >
-                    確認發布廣告
-                  </button>
+            {/* Drag-to-reorder Banner List */}
+            <div className="space-y-4">
+              {localBanners.length === 0 ? (
+                <div className="py-12 text-center text-slate-400 font-bold bg-slate-50 rounded-2xl border border-slate-200 border-dashed">
+                  目前沒有廣告，新增一個來宣傳商品吧！
                 </div>
-              </div>
-            )}
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6">
-              {banners.map(banner => (
-                <div key={banner.id} className="relative group rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl transition-all">
-                  <img src={banner.imageUrl} alt="banner" className="w-full h-48 object-cover" />
-                  <div className="absolute top-4 left-4">
-                    <span className="bg-indigo-600/90 backdrop-blur text-white px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider shadow-lg">
-                      {banner.tag || '精選推薦'}
-                    </span>
-                  </div>
-                  <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center">
+              ) : (
+                localBanners.map((banner, idx) => (
+                  <div
+                    key={banner.id}
+                    draggable
+                    onDragStart={() => setDragBannerIdx(idx)}
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      if (dragBannerIdx === null || dragBannerIdx === idx) return;
+                      const newOrder = [...localBanners];
+                      const [moved] = newOrder.splice(dragBannerIdx, 1);
+                      newOrder.splice(idx, 0, moved);
+                      setDragBannerIdx(idx);
+                      setLocalBanners(newOrder);
+                    }}
+                    onDragEnd={async () => {
+                      setDragBannerIdx(null);
+                      await updateBannersOrder(localBanners);
+                    }}
+                    className={`flex items-center gap-4 bg-slate-50 rounded-2xl border border-slate-100 overflow-hidden group transition-all ${dragBannerIdx === idx ? 'opacity-50 scale-[0.98]' : 'hover:shadow-md'
+                      }`}
+                  >
+                    {/* Drag Handle */}
+                    <div className="pl-4 text-slate-300 cursor-grab active:cursor-grabbing shrink-0">
+                      <GripVertical size={24} />
+                    </div>
+                    {/* Thumbnail */}
+                    <img
+                      src={banner.imageUrl}
+                      alt={banner.tag}
+                      className="w-32 h-20 object-cover shrink-0"
+                      style={{ objectPosition: banner.objectPosition || 'center' }}
+                    />
+                    {/* Info */}
+                    <div className="flex-1 min-w-0">
+                      <span className="bg-indigo-100 text-indigo-700 px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest">
+                        {banner.tag || '精選推薦'}
+                      </span>
+                      <p className="text-xs text-slate-400 font-bold mt-2">
+                        手機 {banner.mobileHeight || 'h-48'} &nbsp;•&nbsp; 電腦 {banner.desktopHeight || 'md:h-72'}
+                      </p>
+                    </div>
+                    {/* Rank badge */}
+                    <span className="text-[10px] font-black text-slate-300 px-2 shrink-0">#{idx + 1}</span>
+                    {/* Delete */}
                     <button
                       onClick={async () => {
                         if (confirm('確定要移除此廣告嗎？')) {
@@ -1277,22 +1214,245 @@ const Admin: React.FC<AdminProps> = ({ onRefresh }) => {
                           showAlert('已移除廣告', 'success');
                         }
                       }}
-                      className="bg-white text-rose-500 px-6 py-2 rounded-xl font-black hover:bg-rose-50"
+                      className="p-4 text-slate-300 hover:text-rose-500 transition-colors opacity-0 group-hover:opacity-100 shrink-0"
                     >
-                      移 除
+                      <Trash2 size={18} />
                     </button>
                   </div>
-                </div>
-              ))}
-              {banners.length === 0 && (
-                <div className="col-span-full py-12 text-center text-slate-400 font-bold bg-slate-50 rounded-2xl border border-slate-200 border-dashed">
-                  目前沒有廣告，新增一個來宣傳商品吧！
-                </div>
+                ))
               )}
             </div>
           </div>
         )
       }
+
+      {/* Full-screen Banner Preview Modal */}
+      {isAddingBanner && (
+        <div className="fixed inset-0 z-[200] bg-slate-900/80 backdrop-blur-lg flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-6xl rounded-[3rem] shadow-2xl overflow-hidden flex flex-col md:flex-row" style={{ maxHeight: '92vh' }}>
+
+            {/* Left: Live Preview */}
+            <div className="flex-1 bg-slate-100 flex flex-col">
+              {/* Preview Mode Toggle */}
+              <div className="flex items-center gap-2 p-4 bg-white border-b border-slate-100">
+                <span className="text-xs font-black text-slate-400 uppercase tracking-widest mr-2">預覽模式</span>
+                <button
+                  onClick={() => setBannerPreviewMode('desktop')}
+                  className={`flex items-center gap-1 px-4 py-2 rounded-xl text-xs font-black transition-all ${bannerPreviewMode === 'desktop' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-50'
+                    }`}
+                >
+                  <Monitor size={14} /> 電腦
+                </button>
+                <button
+                  onClick={() => setBannerPreviewMode('mobile')}
+                  className={`flex items-center gap-1 px-4 py-2 rounded-xl text-xs font-black transition-all ${bannerPreviewMode === 'mobile' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-50'
+                    }`}
+                >
+                  <Smartphone size={14} /> 手機
+                </button>
+              </div>
+
+              {/* Preview Area */}
+              <div className="flex-1 flex items-center justify-center p-8 overflow-auto">
+                {bannerPreviewMode === 'desktop' ? (
+                  /* Desktop preview */
+                  <div className="w-full max-w-2xl bg-white rounded-[2rem] overflow-hidden shadow-xl border-4 border-white ring-1 ring-slate-200">
+                    <div
+                      className={`relative w-full overflow-hidden rounded-[2rem] ${newBannerDesktopHeight || 'md:h-72'} h-72`}
+                    >
+                      {bannerPreview ? (
+                        <img
+                          src={bannerPreview}
+                          alt="preview"
+                          className="w-full h-full object-cover transition-all duration-500"
+                          style={{ objectPosition: newBannerPosition || 'center' }}
+                        />
+                      ) : (
+                        <div className="w-full h-full bg-slate-200 flex items-center justify-center">
+                          <p className="text-slate-400 font-bold text-lg">請先上傳圖片</p>
+                        </div>
+                      )}
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent flex items-end p-8">
+                        <span className="bg-indigo-600/90 backdrop-blur text-white px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider">
+                          {newBannerTag || '標籤文字'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  /* Mobile preview - phone frame */
+                  <div className="w-72 bg-white rounded-[2.5rem] overflow-hidden shadow-2xl border-4 border-slate-800 ring-4 ring-slate-700">
+                    <div className="bg-slate-800 h-6 flex items-center justify-center">
+                      <div className="w-16 h-1.5 bg-slate-600 rounded-full"></div>
+                    </div>
+                    <div
+                      className={`relative w-full overflow-hidden ${newBannerMobileHeight || 'h-48'}`}
+                    >
+                      {bannerPreview ? (
+                        <img
+                          src={bannerPreview}
+                          alt="preview"
+                          className="w-full h-full object-cover transition-all duration-500"
+                          style={{ objectPosition: newBannerPosition || 'center' }}
+                        />
+                      ) : (
+                        <div className="w-full h-full bg-slate-200 flex items-center justify-center">
+                          <p className="text-slate-400 font-bold text-sm">請先上傳圖片</p>
+                        </div>
+                      )}
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent flex items-end p-4">
+                        <span className="bg-indigo-600/90 backdrop-blur text-white px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider">
+                          {newBannerTag || '標籤文字'}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="p-3 bg-white h-16"></div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Right: Settings Panel */}
+            <div className="w-full md:w-96 flex flex-col border-l border-slate-100 overflow-y-auto">
+              <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+                <h3 className="text-xl font-black text-slate-800">廣告設定</h3>
+                <button
+                  onClick={() => {
+                    setIsAddingBanner(false);
+                    setNewBannerImage('');
+                    setBannerPreview(null);
+                    setNewBannerTag('精選推薦');
+                    setNewBannerPosition('center');
+                    setNewBannerMobileHeight('h-48');
+                    setNewBannerDesktopHeight('md:h-72');
+                  }}
+                  className="p-2 rounded-xl text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-all"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              <div className="p-6 space-y-6 flex-1">
+                {/* Image Upload */}
+                <div>
+                  <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-3">1. 上傳圖片 (500KB以內)</label>
+                  <label className={`flex items-center justify-center gap-2 p-6 rounded-2xl border-2 border-dashed cursor-pointer font-bold transition-all ${bannerPreview
+                    ? 'border-emerald-300 bg-emerald-50 text-emerald-600'
+                    : 'border-slate-300 hover:border-indigo-400 hover:bg-indigo-50 text-slate-500 hover:text-indigo-600'
+                    }`}>
+                    <Upload size={20} />
+                    {bannerPreview ? '✅ 已選好圖片，可重新選擇' : '選擇廣告圖片檔案'}
+                    <input type="file" className="hidden" accept="image/*" onChange={handleBannerImageSelect} />
+                  </label>
+                </div>
+
+                {/* Tag */}
+                <div>
+                  <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-3">2. 廣告標籤</label>
+                  <input
+                    list="banner-tags-modal"
+                    value={newBannerTag}
+                    onChange={(e) => setNewBannerTag(e.target.value)}
+                    placeholder="輸入或選擇標籤..."
+                    className="w-full p-4 rounded-2xl border-2 border-slate-100 font-bold text-slate-700 outline-none focus:border-indigo-500 transition-all"
+                  />
+                  <datalist id="banner-tags-modal">
+                    <option value="精選推薦" />
+                    <option value="新品上架" />
+                    <option value="特價出清" />
+                    <option value="限時活動" />
+                    <option value="最新公告" />
+                  </datalist>
+                </div>
+
+                {/* Position */}
+                <div>
+                  <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-3">3. 焦點位置</label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {['top', 'center', 'bottom', 'left', 'right', '50% 20%'].map(pos => (
+                      <button
+                        key={pos}
+                        onClick={() => setNewBannerPosition(pos)}
+                        className={`py-2 rounded-xl text-xs font-black transition-all ${newBannerPosition === pos
+                          ? 'bg-indigo-600 text-white shadow-md'
+                          : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                          }`}
+                      >
+                        {pos === 'top' ? '偏上' : pos === 'center' ? '置中' : pos === 'bottom' ? '偏下' : pos === 'left' ? '偏左' : pos === 'right' ? '偏右' : '自訂'}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Heights */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1"><Smartphone size={12} /> 手機高度</label>
+                    <select
+                      value={newBannerMobileHeight}
+                      onChange={(e) => setNewBannerMobileHeight(e.target.value)}
+                      className="w-full p-3 rounded-xl border-2 border-slate-100 font-bold text-slate-700 outline-none focus:border-indigo-500 text-sm"
+                    >
+                      <option value="h-32">極短 128px</option>
+                      <option value="h-40">短 160px</option>
+                      <option value="h-48">中 192px</option>
+                      <option value="h-56">長 224px</option>
+                      <option value="h-64">極長 256px</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1"><Monitor size={12} /> 電腦高度</label>
+                    <select
+                      value={newBannerDesktopHeight}
+                      onChange={(e) => setNewBannerDesktopHeight(e.target.value)}
+                      className="w-full p-3 rounded-xl border-2 border-slate-100 font-bold text-slate-700 outline-none focus:border-indigo-500 text-sm"
+                    >
+                      <option value="md:h-48">短 192px</option>
+                      <option value="md:h-64">中 256px</option>
+                      <option value="md:h-72">標準 288px</option>
+                      <option value="md:h-80">長 320px</option>
+                      <option value="md:h-96">極長 384px</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Publish Button */}
+              <div className="p-6 border-t border-slate-100">
+                <button
+                  onClick={async () => {
+                    if (!newBannerImage) {
+                      showAlert('請先選擇圖片檔案喔', 'error');
+                      return;
+                    }
+                    await addBanner(
+                      newBannerImage,
+                      newBannerTag,
+                      newBannerPosition,
+                      newBannerMobileHeight,
+                      newBannerDesktopHeight
+                    );
+                    setNewBannerImage('');
+                    setNewBannerTag('精選推薦');
+                    setNewBannerPosition('center');
+                    setNewBannerMobileHeight('h-48');
+                    setNewBannerDesktopHeight('md:h-72');
+                    setBannerPreview(null);
+                    setIsAddingBanner(false);
+                    showAlert('廣告新增成功！', 'success');
+                  }}
+                  className={`w-full py-5 rounded-2xl font-black text-lg transition-all active:scale-95 flex items-center justify-center gap-3 ${bannerPreview
+                    ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-xl shadow-emerald-100'
+                    : 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                    }`}
+                >
+                  <Check size={24} /> 確認發布廣告
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {
         activeTab === 'missions' && (

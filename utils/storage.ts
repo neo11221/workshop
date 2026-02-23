@@ -800,10 +800,29 @@ export const subscribeToBanners = (callback: (banners: Banner[]) => void): Unsub
   const q = query(collection(db, COLLECTIONS.BANNERS));
   return onSnapshot(q, (snapshot) => {
     const banners = snapshot.docs.map(doc => doc.data() as Banner);
-    // Sort by timestamp desc
-    banners.sort((a, b) => b.timestamp - a.timestamp);
+    // Sort by order field first, fall back to timestamp desc
+    banners.sort((a, b) => {
+      if (a.order !== undefined && b.order !== undefined) return a.order - b.order;
+      if (a.order !== undefined) return -1;
+      if (b.order !== undefined) return 1;
+      return b.timestamp - a.timestamp;
+    });
     callback(banners);
   }, (error) => {
     console.error('Error subscribing to banners:', error);
   });
+};
+
+export const updateBannersOrder = async (orderedBanners: Banner[]): Promise<void> => {
+  try {
+    const batch = writeBatch(db);
+    orderedBanners.forEach((banner, index) => {
+      const ref = doc(db, COLLECTIONS.BANNERS, banner.id);
+      batch.update(ref, { order: index });
+    });
+    await batch.commit();
+  } catch (error) {
+    console.error('Error updating banner order:', error);
+    throw error;
+  }
 };
