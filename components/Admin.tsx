@@ -33,6 +33,7 @@ const Admin: React.FC<AdminProps> = ({ onRefresh }) => {
   const [localBanners, setLocalBanners] = useState<Banner[]>([]);
   const [dragBannerIdx, setDragBannerIdx] = useState<number | null>(null);
   const [bannerPreviewMode, setBannerPreviewMode] = useState<'desktop' | 'mobile'>('desktop');
+  const [isFocalDragging, setIsFocalDragging] = useState(false);
   const [scanInput, setScanInput] = useState('');
   const [scanResult, setScanResult] = useState<Redemption | null>(null);
   const redemptionsRef = React.useRef(redemptions);
@@ -1255,24 +1256,61 @@ const Admin: React.FC<AdminProps> = ({ onRefresh }) => {
               {/* Preview Area */}
               <div className="flex-1 flex items-center justify-center p-8 overflow-auto">
                 {bannerPreviewMode === 'desktop' ? (
-                  /* Desktop preview */
+                  /* Desktop preview — drag to set focal point */
                   <div className="w-full max-w-2xl bg-white rounded-[2rem] overflow-hidden shadow-xl border-4 border-white ring-1 ring-slate-200">
                     <div
-                      className={`relative w-full overflow-hidden rounded-[2rem] ${newBannerDesktopHeight || 'md:h-72'} h-72`}
+                      className={`relative w-full overflow-hidden rounded-[2rem] ${newBannerDesktopHeight || 'md:h-72'} h-72 ${bannerPreview ? 'cursor-crosshair' : ''}`}
+                      onMouseDown={(e) => {
+                        if (!bannerPreview) return;
+                        setIsFocalDragging(true);
+                        const rect = e.currentTarget.getBoundingClientRect();
+                        const x = Math.round(((e.clientX - rect.left) / rect.width) * 100);
+                        const y = Math.round(((e.clientY - rect.top) / rect.height) * 100);
+                        setNewBannerPosition(`${x}% ${y}%`);
+                      }}
+                      onMouseMove={(e) => {
+                        if (!isFocalDragging || !bannerPreview) return;
+                        const rect = e.currentTarget.getBoundingClientRect();
+                        const x = Math.round(((e.clientX - rect.left) / rect.width) * 100);
+                        const y = Math.round(((e.clientY - rect.top) / rect.height) * 100);
+                        setNewBannerPosition(`${x}% ${y}%`);
+                      }}
+                      onMouseUp={() => setIsFocalDragging(false)}
+                      onMouseLeave={() => setIsFocalDragging(false)}
                     >
                       {bannerPreview ? (
-                        <img
-                          src={bannerPreview}
-                          alt="preview"
-                          className="w-full h-full object-cover transition-all duration-500"
-                          style={{ objectPosition: newBannerPosition || 'center' }}
-                        />
+                        <>
+                          <img
+                            src={bannerPreview}
+                            alt="preview"
+                            className="w-full h-full object-cover transition-[object-position] duration-100 select-none pointer-events-none"
+                            style={{ objectPosition: newBannerPosition || 'center' }}
+                            draggable={false}
+                          />
+                          {/* Focal Point Dot */}
+                          {(() => {
+                            const parts = (newBannerPosition || '50% 50%').split(' ');
+                            const px = parseFloat(parts[0]) || 50;
+                            const py = parseFloat(parts[1]) || 50;
+                            return (
+                              <div
+                                className="absolute w-6 h-6 -translate-x-1/2 -translate-y-1/2 pointer-events-none"
+                                style={{ left: `${px}%`, top: `${py}%` }}
+                              >
+                                <div className="w-6 h-6 rounded-full border-4 border-white shadow-lg bg-indigo-500/70 animate-pulse" />
+                                <div className="absolute inset-0 flex items-center justify-center">
+                                  <div className="w-1 h-1 bg-white rounded-full" />
+                                </div>
+                              </div>
+                            );
+                          })()}
+                        </>
                       ) : (
                         <div className="w-full h-full bg-slate-200 flex items-center justify-center">
                           <p className="text-slate-400 font-bold text-lg">請先上傳圖片</p>
                         </div>
                       )}
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent flex items-end p-8">
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent flex items-end p-8 pointer-events-none">
                         <span className="bg-indigo-600/90 backdrop-blur text-white px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider">
                           {newBannerTag || '標籤文字'}
                         </span>
@@ -1280,27 +1318,61 @@ const Admin: React.FC<AdminProps> = ({ onRefresh }) => {
                     </div>
                   </div>
                 ) : (
-                  /* Mobile preview - phone frame */
+                  /* Mobile preview - phone frame — drag to set focal point */
                   <div className="w-72 bg-white rounded-[2.5rem] overflow-hidden shadow-2xl border-4 border-slate-800 ring-4 ring-slate-700">
                     <div className="bg-slate-800 h-6 flex items-center justify-center">
                       <div className="w-16 h-1.5 bg-slate-600 rounded-full"></div>
                     </div>
                     <div
-                      className={`relative w-full overflow-hidden ${newBannerMobileHeight || 'h-48'}`}
+                      className={`relative w-full overflow-hidden ${newBannerMobileHeight || 'h-48'} ${bannerPreview ? 'cursor-crosshair' : ''}`}
+                      onMouseDown={(e) => {
+                        if (!bannerPreview) return;
+                        setIsFocalDragging(true);
+                        const rect = e.currentTarget.getBoundingClientRect();
+                        const x = Math.round(((e.clientX - rect.left) / rect.width) * 100);
+                        const y = Math.round(((e.clientY - rect.top) / rect.height) * 100);
+                        setNewBannerPosition(`${x}% ${y}%`);
+                      }}
+                      onMouseMove={(e) => {
+                        if (!isFocalDragging || !bannerPreview) return;
+                        const rect = e.currentTarget.getBoundingClientRect();
+                        const x = Math.round(((e.clientX - rect.left) / rect.width) * 100);
+                        const y = Math.round(((e.clientY - rect.top) / rect.height) * 100);
+                        setNewBannerPosition(`${x}% ${y}%`);
+                      }}
+                      onMouseUp={() => setIsFocalDragging(false)}
+                      onMouseLeave={() => setIsFocalDragging(false)}
                     >
                       {bannerPreview ? (
-                        <img
-                          src={bannerPreview}
-                          alt="preview"
-                          className="w-full h-full object-cover transition-all duration-500"
-                          style={{ objectPosition: newBannerPosition || 'center' }}
-                        />
+                        <>
+                          <img
+                            src={bannerPreview}
+                            alt="preview"
+                            className="w-full h-full object-cover transition-[object-position] duration-100 select-none pointer-events-none"
+                            style={{ objectPosition: newBannerPosition || 'center' }}
+                            draggable={false}
+                          />
+                          {/* Focal Point Dot */}
+                          {(() => {
+                            const parts = (newBannerPosition || '50% 50%').split(' ');
+                            const px = parseFloat(parts[0]) || 50;
+                            const py = parseFloat(parts[1]) || 50;
+                            return (
+                              <div
+                                className="absolute w-5 h-5 -translate-x-1/2 -translate-y-1/2 pointer-events-none"
+                                style={{ left: `${px}%`, top: `${py}%` }}
+                              >
+                                <div className="w-5 h-5 rounded-full border-4 border-white shadow-lg bg-indigo-500/70 animate-pulse" />
+                              </div>
+                            );
+                          })()}
+                        </>
                       ) : (
                         <div className="w-full h-full bg-slate-200 flex items-center justify-center">
                           <p className="text-slate-400 font-bold text-sm">請先上傳圖片</p>
                         </div>
                       )}
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent flex items-end p-4">
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent flex items-end p-4 pointer-events-none">
                         <span className="bg-indigo-600/90 backdrop-blur text-white px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider">
                           {newBannerTag || '標籤文字'}
                         </span>
@@ -1365,22 +1437,17 @@ const Admin: React.FC<AdminProps> = ({ onRefresh }) => {
                   </datalist>
                 </div>
 
-                {/* Position */}
+                {/* Position - now drag on preview */}
                 <div>
-                  <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-3">3. 焦點位置</label>
-                  <div className="grid grid-cols-3 gap-2">
-                    {['top', 'center', 'bottom', 'left', 'right', '50% 20%'].map(pos => (
-                      <button
-                        key={pos}
-                        onClick={() => setNewBannerPosition(pos)}
-                        className={`py-2 rounded-xl text-xs font-black transition-all ${newBannerPosition === pos
-                          ? 'bg-indigo-600 text-white shadow-md'
-                          : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
-                          }`}
-                      >
-                        {pos === 'top' ? '偏上' : pos === 'center' ? '置中' : pos === 'bottom' ? '偏下' : pos === 'left' ? '偏左' : pos === 'right' ? '偏右' : '自訂'}
-                      </button>
-                    ))}
+                  <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">3. 焦點位置</label>
+                  <div className="bg-slate-50 rounded-xl p-3 border border-slate-100">
+                    <p className="text-xs font-bold text-slate-400 text-center">
+                      {bannerPreview ? (
+                        <><span className="text-indigo-500 font-black">← 在左技圖片上點擊拖動來設定焦點</span><br /><span className="text-[10px] font-bold text-slate-300">({newBannerPosition})</span></>
+                      ) : (
+                        '請先上傳圖片後才能設定焦點'
+                      )}
+                    </p>
                   </div>
                 </div>
 
