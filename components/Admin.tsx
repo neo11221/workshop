@@ -735,8 +735,8 @@ const Admin: React.FC<AdminProps> = ({ onRefresh }) => {
               onClick={handleIssuePoints}
               disabled={isProcessing || !targetStudentId || !pointAmount}
               className={`w-full text-white font-black py-8 rounded-[2rem] transition-all shadow-2xl flex items-center justify-center gap-4 text-2xl active:scale-95 group ${isProcessing || !targetStudentId || !pointAmount
-                  ? 'bg-slate-300 shadow-none cursor-not-allowed'
-                  : 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-200'
+                ? 'bg-slate-300 shadow-none cursor-not-allowed'
+                : 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-200'
                 }`}
             >
               {isProcessing ? (
@@ -882,7 +882,7 @@ const Admin: React.FC<AdminProps> = ({ onRefresh }) => {
                   <div className="flex flex-col gap-2">
                     <label className="flex items-center justify-center gap-2 p-3 rounded-xl border-2 border-dashed border-slate-300 hover:border-indigo-400 hover:bg-indigo-50 transition-all cursor-pointer font-bold text-slate-500 hover:text-indigo-600">
                       <Upload size={18} />
-                      {newProductImage ? '已選擇圖片' : '上傳商品圖片 (200KB內)'}
+                      {newProductImage ? '已選擇圖片' : '上傳商品圖片 (500KB內)'}
                       <input type="file" className="hidden" accept="image/*" onChange={handleProductImageSelect} />
                     </label>
                     {imagePreview && <img src={imagePreview} className="h-20 w-auto object-cover rounded-lg border border-slate-200" alt="preview" />}
