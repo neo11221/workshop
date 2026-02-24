@@ -484,6 +484,12 @@ export const approveMission = async (submissionId: string) => {
 
       if (submission.status !== 'pending') throw new Error('此申請已被處理過');
 
+      // --- ALL READS FIRST ---
+      const studentRef = doc(db, COLLECTIONS.STUDENTS, submission.userId);
+      const studentSnap = await transaction.get(studentRef);
+
+      // --- THEN ALL WRITES ---
+
       // 1. 更新狀態
       transaction.update(submissionRef, { status: 'approved' });
 
@@ -498,8 +504,6 @@ export const approveMission = async (submissionId: string) => {
       });
 
       // 3. 獎勵點數
-      const studentRef = doc(db, COLLECTIONS.STUDENTS, submission.userId);
-      const studentSnap = await transaction.get(studentRef);
       if (studentSnap.exists()) {
         const student = studentSnap.data() as UserProfile;
         transaction.update(studentRef, {
