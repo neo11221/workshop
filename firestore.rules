@@ -37,7 +37,9 @@ service cloud.firestore {
     }
     match /products/{id} {
       allow read: if isAuthenticated();
-      allow write: if isAdmin();
+      allow create, delete: if isAdmin();
+      // admin 可以完整修改，驗證用戶只能更新庫存 (兌換用)
+      allow update: if isAdmin() || (isVerifiedUser() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['stock']));
     }
     match /productCategories/{id} {
       allow read: if isAuthenticated();
