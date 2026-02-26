@@ -106,9 +106,34 @@ const Navigation = ({ user, currentRank, onSwitchUser }: { user: UserProfile, cu
 
 import { AlertProvider } from './components/AlertProvider';
 import ErrorBoundary from './components/ErrorBoundary';
+import { doc, onSnapshot } from 'firebase/firestore';
+import { db } from './utils/firebase';
 
 const App: React.FC = () => {
   const [user, setUser] = useState<UserProfile | null>(getUser());
+
+  useEffect(() => {
+    if (!user || user.role === UserRole.ADMIN) return;
+
+    // Listen for real-time updates to the student's profile
+    const unsub = onSnapshot(doc(db, 'students', user.id), (snapshot) => {
+      if (snapshot.exists()) {
+        const updatedUser = { ...snapshot.data(), id: snapshot.id } as UserProfile;
+
+        // Only update if critical data changed to prevent unnecessary re-renders
+        const storageUser = getUser();
+        if (!storageUser ||
+          updatedUser.points !== storageUser.points ||
+          updatedUser.totalEarned !== storageUser.totalEarned ||
+          updatedUser.isApproved !== storageUser.isApproved) {
+          setUser(updatedUser);
+          saveUser(updatedUser); // Update local storage for persistence
+        }
+      }
+    });
+
+    return () => unsub();
+  }, [user?.id]);
 
   const currentRank = user ? RANKS.reduce((prev, curr) => {
     if (user.totalEarned >= curr.threshold) return curr;

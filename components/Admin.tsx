@@ -53,7 +53,8 @@ const Admin: React.FC<AdminProps> = ({ onRefresh }) => {
   const [targetStudentId, setTargetStudentId] = useState<string>('');
   const [pointAmount, setPointAmount] = useState<string>('100');
   const [reason, setReason] = useState('考試成績優異');
-  const [newReason, setNewReason] = useState('');
+  const [customReason, setCustomReason] = useState('');
+  const [newPresetReason, setNewPresetReason] = useState('');
   const [isAddingReason, setIsAddingReason] = useState(false);
 
   // 商品管理
@@ -192,10 +193,14 @@ const Admin: React.FC<AdminProps> = ({ onRefresh }) => {
   };
 
   const handleConfirmRedemption = async (redemptionId: string) => {
-    if (scanResult) {
+    try {
       await updateRedemptionStatus(redemptionId, 'completed');
-      setScanResult(null);
+      if (scanResult && scanResult.id === redemptionId) {
+        setScanResult(null);
+      }
       showAlert('核銷成功，獎勵已發放！', 'success');
+    } catch (error: any) {
+      showAlert(`核銷失敗: ${error.message}`, 'error');
     }
   };
 
@@ -204,15 +209,21 @@ const Admin: React.FC<AdminProps> = ({ onRefresh }) => {
     const amount = parseInt(pointAmount);
     if (isNaN(amount) || !targetStudentId) return;
 
+    const finalReason = reason === 'other' ? customReason : reason;
+    if (!finalReason) {
+      showAlert('請輸入或選擇發放原因', 'error');
+      return;
+    }
+
     setIsProcessing(true);
     try {
-      console.log(`[Points] Issuing ${amount} to ${targetStudentId}...`);
+      console.log(`[Points] Issuing ${amount} to ${targetStudentId} for ${finalReason}...`);
       await issuePointsAtomic(targetStudentId, amount);
       setPointAmount('');
+      if (reason === 'other') setCustomReason('');
+
       const targetStudent = students.find(s => s.id === targetStudentId);
       showAlert(`發送成功！已給予 ${targetStudent?.name || ''} ${amount} 點。`, 'success');
-      // onRefresh() is redundant here as the real-time listener will update the list
-      // and points issuance doesn't affect the admin's own profile.
     } catch (error: any) {
       console.error('[Points] Error:', error);
       showAlert(`發放失敗: ${error.message}`, 'error');
@@ -367,15 +378,15 @@ const Admin: React.FC<AdminProps> = ({ onRefresh }) => {
   };
 
   const handleAddReason = async () => {
-    if (!newReason) {
+    if (!newPresetReason) {
       showAlert('請輸入加分項目名稱', 'error');
       return;
     }
     await addPointReason({
       id: `r_${Date.now()}`,
-      title: newReason
+      title: newPresetReason
     });
-    setNewReason('');
+    setNewPresetReason('');
     setIsAddingReason(false);
     showAlert('加分項目已新增', 'success');
   };
@@ -663,8 +674,8 @@ const Admin: React.FC<AdminProps> = ({ onRefresh }) => {
                     <input
                       type="text"
                       placeholder="輸入新名目 (例: 認真打掃)"
-                      value={newReason}
-                      onChange={e => setNewReason(e.target.value)}
+                      value={newPresetReason}
+                      onChange={e => setNewPresetReason(e.target.value)}
                       className="flex-1 p-3 border-2 border-slate-200 rounded-xl focus:border-indigo-600 outline-none font-bold"
                     />
                     <button
@@ -707,13 +718,14 @@ const Admin: React.FC<AdminProps> = ({ onRefresh }) => {
                   <option value="other">其他自定義原因</option>
                 </select>
               )}
-              {reason === 'other' && !isAddingReason && (
+              {reason === 'other' && (
                 <input
                   type="text"
                   placeholder="請輸入發放原因..."
-                  value={reason === 'other' ? '' : reason}
-                  onChange={e => setReason(e.target.value)}
-                  className="w-full mt-4 p-5 bg-white border-2 border-indigo-200 rounded-2xl outline-none font-bold text-slate-700"
+                  value={customReason}
+                  onChange={e => setCustomReason(e.target.value)}
+                  className="w-full mt-4 p-5 bg-white border-2 border-indigo-200 rounded-2xl outline-none font-bold text-slate-700 animate-in slide-in-from-top-2 duration-200"
+                  autoFocus
                 />
               )}
             </div>
