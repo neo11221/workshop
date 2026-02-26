@@ -160,11 +160,15 @@ export const getUser = (): UserProfile | null => {
 
 export const saveUser = async (user: UserProfile) => {
   // Save to localStorage for session
-  localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(user));
+  saveUserSession(user);
   // Sync to Firestore if student
   if (user.role === UserRole.STUDENT) {
     await saveStudent(user);
   }
+};
+
+export const saveUserSession = (user: UserProfile) => {
+  localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(user));
 };
 
 import { auth } from './firebase';
@@ -695,8 +699,19 @@ export const subscribeToStudents = (callback: (students: UserProfile[]) => void)
     },
     (error) => {
       console.error('Error in subscribeToStudents:', error);
-      // alert('無法讀取學生資料！請檢查 Firestore 權限規則');
     }
+  );
+};
+
+export const subscribeToStudent = (studentId: string, callback: (student: UserProfile) => void): Unsubscribe => {
+  return onSnapshot(
+    doc(db, COLLECTIONS.STUDENTS, studentId),
+    (snapshot) => {
+      if (snapshot.exists()) {
+        callback({ ...snapshot.data(), id: snapshot.id } as UserProfile);
+      }
+    },
+    (error) => console.error('Error in subscribeToStudent:', error)
   );
 };
 

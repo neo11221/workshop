@@ -106,33 +106,38 @@ const Navigation = ({ user, currentRank, onSwitchUser }: { user: UserProfile, cu
 
 import { AlertProvider } from './components/AlertProvider';
 import ErrorBoundary from './components/ErrorBoundary';
-import { doc, onSnapshot } from 'firebase/firestore';
-import { db } from './utils/firebase';
+import { subscribeToStudent, saveUserSession } from './utils/storage';
 
 const App: React.FC = () => {
   const [user, setUser] = useState<UserProfile | null>(getUser());
 
   useEffect(() => {
-    if (!user || user.role === UserRole.ADMIN) return;
+    if (!user || user.role !== UserRole.STUDENT) return;
+
+    console.log(`[Sync] Starting real-time listener for student: ${user.name} (${user.id})`);
 
     // Listen for real-time updates to the student's profile
-    const unsub = onSnapshot(doc(db, 'students', user.id), (snapshot) => {
-      if (snapshot.exists()) {
-        const updatedUser = { ...snapshot.data(), id: snapshot.id } as UserProfile;
+    const unsub = subscribeToStudent(user.id, (updatedUser) => {
+      setUser(prev => {
+        if (!prev) return updatedUser;
 
         // Only update if critical data changed to prevent unnecessary re-renders
-        const storageUser = getUser();
-        if (!storageUser ||
-          updatedUser.points !== storageUser.points ||
-          updatedUser.totalEarned !== storageUser.totalEarned ||
-          updatedUser.isApproved !== storageUser.isApproved) {
-          setUser(updatedUser);
-          saveUser(updatedUser); // Update local storage for persistence
+        if (updatedUser.points !== prev.points ||
+          updatedUser.totalEarned !== prev.totalEarned ||
+          updatedUser.isApproved !== prev.isApproved) {
+
+          console.log(`[Sync] Point update detected: ${prev.points} -> ${updatedUser.points}`);
+          saveUserSession(updatedUser); // Update local storage ONLY (avoid loop)
+          return updatedUser;
         }
-      }
+        return prev;
+      });
     });
 
-    return () => unsub();
+    return () => {
+      console.log(`[Sync] Cleaning up listener for ${user.id}`);
+      unsub();
+    };
   }, [user?.id]);
 
   const currentRank = user ? RANKS.reduce((prev, curr) => {
